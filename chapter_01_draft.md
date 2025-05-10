@@ -34,7 +34,9 @@ ______________________________________________________________________
 
 ## Panel 1: Why Traditional Metrics Fail
 
-**Scene Description**: Senior SRE explaining to new team member as they both look at two monitors - left showing a dashboard with all green indicators, right showing customer support queue full of transaction failure reports.
+### Scene Description
+
+ Senior SRE explaining to new team member as they both look at two monitors - left showing a dashboard with all green indicators, right showing customer support queue full of transaction failure reports.
 
 ### Teaching Narrative
 
@@ -68,7 +70,9 @@ For authorization systems, the gap between healthy infrastructure metrics and fa
 
 ## Panel 2: Metrics Evolution Pathway
 
-**Scene Description**: Three-stage visual showing team's monitoring evolution: first showing simplistic up/down dashboard, second showing metrics with graphs and numbers, third showing comprehensive observability with pattern recognition for fraud detection system.
+### Scene Description
+
+ Three-stage visual showing team's monitoring evolution: first showing simplistic up/down dashboard, second showing metrics with graphs and numbers, third showing comprehensive observability with pattern recognition for fraud detection system.
 
 ### Teaching Narrative
 
@@ -110,7 +114,9 @@ In fraud detection systems, the gap between basic metrics and true observability
 
 ## Panel 3: The Business Cost of Metric Blindness
 
-**Scene Description**: Emergency meeting with CRO showing financial impact dashboards after mobile banking outage during payroll day. Charts display increasing financial losses, regulatory penalties, and customer churn metrics.
+### Scene Description
+
+ Emergency meeting with CRO showing financial impact dashboards after mobile banking outage during payroll day. Charts display increasing financial losses, regulatory penalties, and customer churn metrics.
 
 ### Teaching Narrative
 
@@ -177,7 +183,9 @@ When metrics enable just 15 minutes faster detection and resolution, the financi
 
 ## Panel 4: From Data Points to Meaningful Signals
 
-**Scene Description**: Team brainstorming session at whiteboard defining critical SLIs for ATM services. Journey visualization shows progress from raw technical metrics to meaningful customer experience indicators.
+### Scene Description
+
+ Team brainstorming session at whiteboard defining critical SLIs for ATM services. Journey visualization shows progress from raw technical metrics to meaningful customer experience indicators.
 
 ### Teaching Narrative
 
@@ -231,7 +239,9 @@ For ATM services, the gap between technical metrics and customer-centric SLIs di
 
 ## Panel 5: Setting Realistic Performance Targets
 
-**Scene Description**: SRE negotiating with product team about reliability requirements for payment systems. Visual displays trade-off graph with reliability metrics vs. velocity/cost and "five nines" target highlighted with question marks.
+### Scene Description
+
+ SRE negotiating with product team about reliability requirements for payment systems. Visual displays trade-off graph with reliability metrics vs. velocity/cost and "five nines" target highlighted with question marks.
 
 ### Teaching Narrative
 
@@ -290,7 +300,9 @@ For payment systems, appropriate SLO calibration directly impacts both service r
 
 ## Panel 6: Aligning Technical and Regulatory Metrics
 
-**Scene Description**: Meeting between SRE, compliance officer, and business stakeholder discussing service level requirements. Visual shows hierarchy diagram connecting internal SLOs, customer SLAs, and regulatory reporting requirements with metric thresholds.
+### Scene Description
+
+ Meeting between SRE, compliance officer, and business stakeholder discussing service level requirements. Visual shows hierarchy diagram connecting internal SLOs, customer SLAs, and regulatory reporting requirements with metric thresholds.
 
 ### Teaching Narrative
 
@@ -344,7 +356,9 @@ Misalignment between technical and regulatory metrics creates significant compli
 
 ## Panel 7: Building Measurement into Code
 
-**Scene Description**: Developer and SRE pair programming to instrument a new transaction processing service. Split screen shows code before and after instrumentation, with critical measurement points highlighted.
+### Scene Description
+
+ Developer and SRE pair programming to instrument a new transaction processing service. Split screen shows code before and after instrumentation, with critical measurement points highlighted.
 
 ### Teaching Narrative
 
