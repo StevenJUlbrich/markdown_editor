@@ -1,8 +1,9 @@
 # app_controller.py
 from typing import Any, Dict, List, Optional
 
-# Assuming document_model.py (with Pydantic models and numeric IDs) is in the same directory or PYTHONPATH
-from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
+from diff_utils import generate_text_diff  # Import the new utility
+from document_model import H3Pydantic  # Assuming numeric IDs
+from document_model import MarkdownDocument, PanelPydantic
 
 
 class AppController:
@@ -17,10 +18,17 @@ class AppController:
         self.current_selected_panel_id: Optional[int] = None
         self.last_listed_targetable_sections: List[Dict[str, Any]] = []
 
+    # ... (load_document, list_all_h2_sections_for_cli, list_panels_for_cli,
+    #      select_panel_by_number_for_cli, get_current_selected_panel_title,
+    #      list_h3_sections_in_selected_panel_for_cli, list_and_get_h3_content_for_cli,
+    #      list_targetable_sections_in_selected_panel_for_cli,
+    #      _get_target_info_from_display_number, prepare_multiple_selected_sections_for_api,
+    #      update_target_section_content, add_to_target_section_content - these remain the same as numeric_ids_v2) ...
+
     def load_document(self, filepath: str) -> bool:
         """Loads a Markdown document using the model."""
         self.doc_model = MarkdownDocument()
-        self.current_selected_panel_id = None  # Reset selected panel ID
+        self.current_selected_panel_id = None
         self.last_listed_targetable_sections = []
         if self.doc_model.load_and_process(filepath):
             print("Controller: Document loaded and processed successfully.")
@@ -30,22 +38,17 @@ class AppController:
             self.doc_model = None
             return False
 
-    # --- Listing Methods for CLI ---
     def list_all_h2_sections_for_cli(self) -> Optional[List[Dict[str, Any]]]:
-        """1. List All H2 Sections (generic or panel)"""
         if not self.doc_model:
             print("Error: No document loaded.")
             return None
         return self.doc_model.list_all_h2_sections()
 
     def list_panels_for_cli(self) -> Optional[List[PanelPydantic]]:
-        """2. List all Panels"""
         if not self.doc_model:
             print("Error: No document loaded.")
             return None
-        return (
-            self.doc_model.list_panels()
-        )  # Model returns sorted list of PanelPydantic objects
+        return self.doc_model.list_panels()
 
     def select_panel_by_number_for_cli(self, panel_doc_number: int) -> bool:
         if not self.doc_model:
@@ -53,7 +56,7 @@ class AppController:
             return False
         panel = self.doc_model.get_panel_by_number(panel_doc_number)
         if panel:
-            self.current_selected_panel_id = panel.panel_number_in_doc  # Store the ID
+            self.current_selected_panel_id = panel.panel_number_in_doc
             print(
                 f"Controller: Selected Panel ID {panel.panel_number_in_doc}: {panel.panel_title_text}"
             )
@@ -86,13 +89,11 @@ class AppController:
                 f"Error: Could not retrieve selected panel (ID: {self.current_selected_panel_id})."
             )
             return None
-        # Model's list_h3_sections_in_panel returns {"number": h3.h3_number_in_panel, "title": ..., "h3_object":...}
         return self.doc_model.list_h3_sections_in_panel(panel)
 
     def list_and_get_h3_content_for_cli(
         self, h3_list_selection_number: int
     ) -> Optional[str]:
-        """Gets full content for an H3 based on its selection number from the CLI list."""
         if not self.doc_model or self.current_selected_panel_id is None:
             print("Error: No panel selected.")
             return None
@@ -105,7 +106,6 @@ class AppController:
             print(f"Error: Invalid H3 selection number {h3_list_selection_number}.")
             return None
 
-        # h3_options items have "number" which is h3_number_in_panel and "h3_object"
         selected_h3_data = h3_options[h3_list_selection_number - 1]
         h3_pydantic_object = selected_h3_data.get("h3_object")
 
@@ -129,17 +129,14 @@ class AppController:
                 f"Error: Could not retrieve selected panel (ID: {self.current_selected_panel_id})."
             )
             return None
-
         self.last_listed_targetable_sections = (
             self.doc_model.list_targetable_sections_in_panel(panel)
         )
         return self.last_listed_targetable_sections
 
-    # --- Content Retrieval and API Preparation ---
     def _get_target_info_from_display_number(
         self, display_number: int
     ) -> Optional[Dict[str, Any]]:
-        """Helper to retrieve target section details from a display number."""
         if not self.last_listed_targetable_sections or not (
             0 < display_number <= len(self.last_listed_targetable_sections)
         ):
@@ -200,7 +197,6 @@ class AppController:
         print(f"--- Prepared {len(prepared_data)} section(s) for API calls. ---")
         return prepared_data
 
-    # --- Modification and API Update Methods ---
     def update_target_section_content(
         self, display_number: int, new_markdown_content: str
     ) -> bool:
@@ -248,6 +244,37 @@ class AppController:
             ),
         )
 
+    def get_h3_section_diff_text(
+        self, panel_id: int, h3_id_in_panel: int
+    ) -> Optional[str]:
+        """
+        Retrieves the original and API-improved markdown for an H3 section
+        and returns a text-based diff.
+        """
+        if not self.doc_model:
+            print("Error: No document loaded.")
+            return None
+
+        panel = self.doc_model.get_panel_by_number(panel_id)
+        if not panel:
+            return f"Error: Panel ID {panel_id} not found."
+
+        h3_section = self.doc_model.get_h3_by_number(panel, h3_id_in_panel)
+        if not h3_section:
+            return f"Error: H3 ID {h3_id_in_panel} not found in Panel ID {panel_id}."
+
+        if h3_section.api_improved_markdown is None:
+            return f"H3 section '{h3_section.heading_text}' (ID: {h3_id_in_panel}) has no API-improved content to compare."
+
+        if (
+            h3_section.original_full_markdown is None
+        ):  # Should not happen if parsing is correct
+            return f"H3 section '{h3_section.heading_text}' (ID: {h3_id_in_panel}) is missing original_full_markdown."
+
+        return generate_text_diff(
+            h3_section.original_full_markdown, h3_section.api_improved_markdown
+        )
+
     def process_api_enhancements_for_h3(
         self,
         panel_id: int,
@@ -260,16 +287,14 @@ class AppController:
             print("Error: No document loaded.")
             return False
 
-        success = self.doc_model.update_h3_section_with_improved_markdown(  # Changed from via_api to with_improved_markdown
+        success = self.doc_model.update_h3_section_with_improved_markdown(
             panel_id, h3_id_in_panel, improved_markdown
         )
-        if success and (
-            recommendation or reason
-        ):  # Also update suggestions if provided
+        if success and (recommendation or reason):
             self.doc_model.update_h3_section_with_api_suggestions(
                 panel_id,
                 h3_id_in_panel,
-                should_enhance=True,  # Implied if we have improved_markdown
+                should_enhance=True,
                 enhancement_type=recommendation,
                 enhancement_reason=reason,
             )
@@ -279,7 +304,8 @@ class AppController:
                 self.doc_model.get_panel_by_number(panel_id), h3_id_in_panel
             )
             h3_title = h3_obj.heading_text if h3_obj else f"ID {h3_id_in_panel}"
-            panel_title = self.doc_model.get_panel_by_number(panel_id).panel_title_text
+            panel_obj = self.doc_model.get_panel_by_number(panel_id)
+            panel_title = panel_obj.panel_title_text if panel_obj else f"ID {panel_id}"
             print(
                 f"Controller: API enhancement for H3 '{h3_title}' in Panel '{panel_title}' recorded."
             )
@@ -289,7 +315,6 @@ class AppController:
             )
         return success
 
-    # --- Save ---
     def save_document(self, output_filepath: str) -> bool:
         if not self.doc_model:
             print("Error: No document loaded to save.")
