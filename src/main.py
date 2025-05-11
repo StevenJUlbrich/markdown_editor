@@ -1,15 +1,13 @@
 # main.py
 from typing import Any, Dict, List, Optional
 
-from app_controller import (
-    AppController,
-)  # Assuming app_controller.py is in the same directory
+from app_controller import AppController
 
 
+# ... (display_numbered_list and get_int_choice helpers remain the same as numeric_ids_v2 version) ...
 def display_numbered_list(
     items: List[Dict[str, Any]], title_key: str = "title", number_key: str = "number"
 ) -> None:
-    """Helper to display a numbered list of items from a list of dictionaries."""
     if not items:
         print("  No items to display.")
         return
@@ -26,21 +24,15 @@ def display_numbered_list(
         if item.get("h4_id") is not None:
             id_info.append(f"H4:{item['h4_id']}")
         id_display = f" [{', '.join(id_info)}]" if id_info else ""
-
-        # For list_all_h2_sections, the 'id' field can be the panel_number_in_doc or a generic title
         raw_id = item.get("id")
-        if (
-            raw_id is not None and not id_info and not item_type
-        ):  # Likely from list_all_h2_sections
+        if raw_id is not None and not id_info and not item_type:
             id_display = f" [RawID: {raw_id}]"
-
         print(f"  {num}. {title}{type_display}{id_display}")
 
 
 def get_int_choice(
     prompt_text: str, max_val: Optional[int] = None, min_val: int = 1
 ) -> Optional[int]:
-    """Helper to get an integer choice from the user."""
     while True:
         try:
             choice_str = input(prompt_text).strip()
@@ -59,16 +51,13 @@ def get_int_choice(
 
 
 def main_cli():
-    """
-    Main command-line interface function for the Markdown Processor.
-    Utilizes numeric IDs for section targeting.
-    """
     controller = AppController()
     document_is_loaded = False
     default_doc_path = "day_03_chapter_01_draft.md"
 
     while True:
-        print("\n======= Markdown Processor CLI (Numeric IDs) =======")
+        print("\n======= Markdown Processor CLI (Numeric IDs + Diff) =======")
+        # ... (status display remains the same) ...
         if (
             document_is_loaded
             and controller.doc_model
@@ -84,6 +73,7 @@ def main_cli():
                 print("No panel currently selected.")
         else:
             print("No document loaded.")
+
         print("----------------------------------------------------")
         print("--- Document Operations ---")
         print("1. Load Document")
@@ -96,13 +86,15 @@ def main_cli():
         print("7. Modify/Add Content in Selected Panel (Target by Display #)")
         print("--- Other ---")
         print("8. Process API Enhancement for Specific H3 (Select Panel & H3 by #)")
-        print("9. Save Document")
+        print("9. View Diff for API-Improved H3 Section")  # New Option
+        print("10. Save Document")  # Renumbered
         print("0. Exit")
         print("----------------------------------------------------")
 
         choice = input("Enter your choice: ")
 
         if choice == "1":
+            # ... (same as numeric_ids_v2) ...
             filepath_to_load = (
                 input(
                     f"Enter document filepath (or press Enter for '{default_doc_path}'): "
@@ -115,6 +107,7 @@ def main_cli():
                 document_is_loaded = False
 
         elif choice == "2":
+            # ... (same as numeric_ids_v2) ...
             if document_is_loaded:
                 print("\n--- All Document H2-Level Sections ---")
                 sections = controller.list_all_h2_sections_for_cli()
@@ -123,11 +116,10 @@ def main_cli():
                 print("  Please load a document first.")
 
         elif choice == "3":
+            # ... (same as numeric_ids_v2) ...
             if document_is_loaded:
                 print("\n--- All Panels ---")
-                panels = (
-                    controller.list_panels_for_cli()
-                )  # Returns list of PanelPydantic objects
+                panels = controller.list_panels_for_cli()
                 if panels:
                     for panel_obj in panels:
                         print(
@@ -139,6 +131,7 @@ def main_cli():
                 print("  Please load a document first.")
 
         elif choice == "4":
+            # ... (same as numeric_ids_v2) ...
             if document_is_loaded:
                 panel_doc_num = get_int_choice(
                     "Enter Panel Document Number to select: "
@@ -154,24 +147,22 @@ def main_cli():
                 print("  Please load a document first.")
 
         elif choice == "5":
+            # ... (same as numeric_ids_v2) ...
             if document_is_loaded and controller.current_selected_panel_id is not None:
                 panel_title = controller.get_current_selected_panel_title()
                 print(
                     f"\n--- H3 Sections in Panel ID {controller.current_selected_panel_id} ('{panel_title}') ---"
                 )
-                h3_options = (
-                    controller.list_h3_sections_in_selected_panel_for_cli()
-                )  # Gets list of {"number": h3_id, "title":...}
+                h3_options = controller.list_h3_sections_in_selected_panel_for_cli()
                 if h3_options:
                     display_numbered_list(
                         h3_options, title_key="title", number_key="number"
-                    )  # "number" is h3_number_in_panel
+                    )
                     h3_selection_num = get_int_choice(
                         "Enter H3 number (from list above) to view its content (or Enter to skip): ",
                         len(h3_options),
                     )
                     if h3_selection_num is not None:
-                        # The 'number' in h3_options IS the h3_number_in_panel
                         selected_h3_data = next(
                             (
                                 h3
@@ -183,7 +174,7 @@ def main_cli():
                         if selected_h3_data:
                             content = controller.list_and_get_h3_content_for_cli(
                                 selected_h3_data["number"]
-                            )  # Pass h3_number_in_panel
+                            )
                             print("\n--- Full H3 Section Content (inc. H4s) ---")
                             print(
                                 content if content else "  No content found or error."
@@ -199,6 +190,7 @@ def main_cli():
                 print("  Please select a Panel first (Option 4).")
 
         elif choice == "6":
+            # ... (same as numeric_ids_v2) ...
             if document_is_loaded and controller.current_selected_panel_id is not None:
                 panel_title = controller.get_current_selected_panel_title()
                 print(
@@ -207,7 +199,7 @@ def main_cli():
                 targetable_sections = (
                     controller.list_targetable_sections_in_selected_panel_for_cli()
                 )
-                if targetable_sections:  # This list now has panel_id, h3_id, h4_id
+                if targetable_sections:
                     display_numbered_list(
                         targetable_sections,
                         title_key="title",
@@ -250,6 +242,7 @@ def main_cli():
                 print("  Please select a Panel first (Option 4).")
 
         elif choice == "7":
+            # ... (same as numeric_ids_v2) ...
             if document_is_loaded and controller.current_selected_panel_id is not None:
                 panel_title = controller.get_current_selected_panel_title()
                 print(
@@ -300,6 +293,7 @@ def main_cli():
                 print("  Please select a Panel first (Option 4).")
 
         elif choice == "8":
+            # ... (same as numeric_ids_v2, uses panel_doc_num and h3_id_in_panel) ...
             if document_is_loaded:
                 print("\n--- Process API Enhancement for H3 Section ---")
                 panel_doc_num = get_int_choice(
@@ -309,12 +303,9 @@ def main_cli():
                     print("Cancelled.")
                     continue
 
-                # Temporarily select panel to list its H3s
                 original_selected_panel_id = controller.current_selected_panel_id
                 if not controller.select_panel_by_number_for_cli(panel_doc_num):
-                    controller.current_selected_panel_id = (
-                        original_selected_panel_id  # Restore
-                    )
+                    controller.current_selected_panel_id = original_selected_panel_id
                     continue
 
                 panel_title = controller.get_current_selected_panel_title()
@@ -324,9 +315,7 @@ def main_cli():
                 h3_options = controller.list_h3_sections_in_selected_panel_for_cli()
                 if not h3_options:
                     print(f"  No H3 sections in Panel ID {panel_doc_num}.")
-                    controller.current_selected_panel_id = (
-                        original_selected_panel_id  # Restore
-                    )
+                    controller.current_selected_panel_id = original_selected_panel_id
                     continue
 
                 display_numbered_list(
@@ -336,9 +325,7 @@ def main_cli():
                     "Enter H3 number (from list above) to enhance: ", len(h3_options)
                 )
 
-                controller.current_selected_panel_id = (
-                    original_selected_panel_id  # Restore original selection
-                )
+                controller.current_selected_panel_id = original_selected_panel_id
 
                 if h3_selection_num is not None:
                     selected_h3_data = next(
@@ -350,9 +337,7 @@ def main_cli():
                         None,
                     )
                     if selected_h3_data:
-                        h3_id_in_panel = selected_h3_data[
-                            "number"
-                        ]  # This is h3_number_in_panel
+                        h3_id_in_panel = selected_h3_data["number"]
                         h3_title_for_prompt = selected_h3_data["title"]
 
                         print(
@@ -362,7 +347,7 @@ def main_cli():
                             controller.doc_model.get_section_markdown_for_api(
                                 panel_id=panel_doc_num, h3_id_in_panel=h3_id_in_panel
                             )
-                        )  # Get current content
+                        )
                         print(f"\nCurrent H3 Content:\n{current_h3_content}\n")
 
                         sim_recommendation = input(
@@ -381,7 +366,7 @@ def main_cli():
                             reason=sim_reason,
                         )
                         print(
-                            "  Note: The document model now holds this 'api_improved_markdown'. Save (Option 9) to see changes."
+                            "  Note: The document model now holds this 'api_improved_markdown'. Save (Option 10) to see changes."
                         )
                     else:
                         print(f"  Invalid H3 selection.")
@@ -390,7 +375,75 @@ def main_cli():
             else:
                 print("  Please load a document first.")
 
-        elif choice == "9":
+        elif choice == "9":  # New Diff Option
+            if document_is_loaded:
+                print("\n--- View Diff for API-Improved H3 Section ---")
+                panel_doc_num = get_int_choice(
+                    "Enter Panel Document Number containing the H3: "
+                )
+                if panel_doc_num is None:
+                    print("Cancelled.")
+                    continue
+
+                original_selected_panel_id = controller.current_selected_panel_id
+                if not controller.select_panel_by_number_for_cli(panel_doc_num):
+                    controller.current_selected_panel_id = original_selected_panel_id
+                    continue
+
+                panel_title = controller.get_current_selected_panel_title()
+                print(
+                    f"\n--- H3 Sections in Panel ID {panel_doc_num} ('{panel_title}') ---"
+                )
+                h3_options = controller.list_h3_sections_in_selected_panel_for_cli()
+                if not h3_options:
+                    print(f"  No H3 sections in Panel ID {panel_doc_num}.")
+                    controller.current_selected_panel_id = original_selected_panel_id
+                    continue
+
+                display_numbered_list(
+                    h3_options, title_key="title", number_key="number"
+                )
+                h3_selection_num = get_int_choice(
+                    "Enter H3 number (from list above) to view diff for: ",
+                    len(h3_options),
+                )
+
+                controller.current_selected_panel_id = (
+                    original_selected_panel_id  # Restore
+                )
+
+                if h3_selection_num is not None:
+                    selected_h3_data = next(
+                        (
+                            h3
+                            for h3 in h3_options
+                            if h3.get("number") == h3_selection_num
+                        ),
+                        None,
+                    )
+                    if selected_h3_data:
+                        h3_id_in_panel = selected_h3_data["number"]
+                        diff_text = controller.get_h3_section_diff_text(
+                            panel_doc_num, h3_id_in_panel
+                        )
+                        if diff_text:
+                            print(
+                                f"\n--- Diff for H3: {selected_h3_data['title']} (Panel ID {panel_doc_num}, H3 ID {h3_id_in_panel}) ---"
+                            )
+                            print(diff_text)
+                            print("-----------------------------------------")
+                        else:
+                            print(
+                                "  Could not generate diff (e.g., no API improved content or error)."
+                            )
+                    else:
+                        print("  Invalid H3 selection.")
+                else:
+                    print("  Diff view cancelled.")
+            else:
+                print("  Please load a document first.")
+
+        elif choice == "10":  # Save Document (was 9)
             if document_is_loaded:
                 output_file = input(
                     "Enter output filepath (e.g., day_03_chapter_01_updated.md): "
