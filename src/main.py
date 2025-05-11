@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from app_controller import AppController
 
 
-# ... (display_numbered_list and get_int_choice helpers remain the same as numeric_ids_v2 version) ...
+# ... (display_numbered_list and get_int_choice helpers remain the same) ...
 def display_numbered_list(
     items: List[Dict[str, Any]], title_key: str = "title", number_key: str = "number"
 ) -> None:
@@ -56,7 +56,9 @@ def main_cli():
     default_doc_path = "day_03_chapter_01_draft.md"
 
     while True:
-        print("\n======= Markdown Processor CLI (Numeric IDs + Diff) =======")
+        print(
+            "\n======= Markdown Processor CLI (Numeric IDs + Diff + JSON Export) ======="
+        )
         # ... (status display remains the same) ...
         if (
             document_is_loaded
@@ -74,7 +76,7 @@ def main_cli():
         else:
             print("No document loaded.")
 
-        print("----------------------------------------------------")
+        print("-----------------------------------------------------------------")
         print("--- Document Operations ---")
         print("1. Load Document")
         print("2. List All Document Sections (Generic & Panel H2s)")
@@ -86,15 +88,16 @@ def main_cli():
         print("7. Modify/Add Content in Selected Panel (Target by Display #)")
         print("--- Other ---")
         print("8. Process API Enhancement for Specific H3 (Select Panel & H3 by #)")
-        print("9. View Diff for API-Improved H3 Section")  # New Option
-        print("10. Save Document")  # Renumbered
+        print("9. View Diff for API-Improved H3 Section")
+        print("10. Export Document Structure to JSON")  # New Option
+        print("11. Save Document")  # Renumbered
         print("0. Exit")
-        print("----------------------------------------------------")
+        print("-----------------------------------------------------------------")
 
         choice = input("Enter your choice: ")
 
         if choice == "1":
-            # ... (same as numeric_ids_v2) ...
+            # ... (same) ...
             filepath_to_load = (
                 input(
                     f"Enter document filepath (or press Enter for '{default_doc_path}'): "
@@ -107,7 +110,7 @@ def main_cli():
                 document_is_loaded = False
 
         elif choice == "2":
-            # ... (same as numeric_ids_v2) ...
+            # ... (same) ...
             if document_is_loaded:
                 print("\n--- All Document H2-Level Sections ---")
                 sections = controller.list_all_h2_sections_for_cli()
@@ -116,7 +119,7 @@ def main_cli():
                 print("  Please load a document first.")
 
         elif choice == "3":
-            # ... (same as numeric_ids_v2) ...
+            # ... (same) ...
             if document_is_loaded:
                 print("\n--- All Panels ---")
                 panels = controller.list_panels_for_cli()
@@ -131,7 +134,7 @@ def main_cli():
                 print("  Please load a document first.")
 
         elif choice == "4":
-            # ... (same as numeric_ids_v2) ...
+            # ... (same) ...
             if document_is_loaded:
                 panel_doc_num = get_int_choice(
                     "Enter Panel Document Number to select: "
@@ -147,7 +150,7 @@ def main_cli():
                 print("  Please load a document first.")
 
         elif choice == "5":
-            # ... (same as numeric_ids_v2) ...
+            # ... (same) ...
             if document_is_loaded and controller.current_selected_panel_id is not None:
                 panel_title = controller.get_current_selected_panel_title()
                 print(
@@ -190,7 +193,7 @@ def main_cli():
                 print("  Please select a Panel first (Option 4).")
 
         elif choice == "6":
-            # ... (same as numeric_ids_v2) ...
+            # ... (same) ...
             if document_is_loaded and controller.current_selected_panel_id is not None:
                 panel_title = controller.get_current_selected_panel_title()
                 print(
@@ -242,7 +245,7 @@ def main_cli():
                 print("  Please select a Panel first (Option 4).")
 
         elif choice == "7":
-            # ... (same as numeric_ids_v2) ...
+            # ... (same) ...
             if document_is_loaded and controller.current_selected_panel_id is not None:
                 panel_title = controller.get_current_selected_panel_title()
                 print(
@@ -293,7 +296,7 @@ def main_cli():
                 print("  Please select a Panel first (Option 4).")
 
         elif choice == "8":
-            # ... (same as numeric_ids_v2, uses panel_doc_num and h3_id_in_panel) ...
+            # ... (same) ...
             if document_is_loaded:
                 print("\n--- Process API Enhancement for H3 Section ---")
                 panel_doc_num = get_int_choice(
@@ -366,7 +369,7 @@ def main_cli():
                             reason=sim_reason,
                         )
                         print(
-                            "  Note: The document model now holds this 'api_improved_markdown'. Save (Option 10) to see changes."
+                            "  Note: The document model now holds this 'api_improved_markdown'. Save (Option 11) to see changes."
                         )
                     else:
                         print(f"  Invalid H3 selection.")
@@ -375,7 +378,8 @@ def main_cli():
             else:
                 print("  Please load a document first.")
 
-        elif choice == "9":  # New Diff Option
+        elif choice == "9":
+            # ... (same as diff tool implementation) ...
             if document_is_loaded:
                 print("\n--- View Diff for API-Improved H3 Section ---")
                 panel_doc_num = get_int_choice(
@@ -408,9 +412,7 @@ def main_cli():
                     len(h3_options),
                 )
 
-                controller.current_selected_panel_id = (
-                    original_selected_panel_id  # Restore
-                )
+                controller.current_selected_panel_id = original_selected_panel_id
 
                 if h3_selection_num is not None:
                     selected_h3_data = next(
@@ -443,7 +445,28 @@ def main_cli():
             else:
                 print("  Please load a document first.")
 
-        elif choice == "10":  # Save Document (was 9)
+        elif choice == "10":  # New JSON Export Option
+            if document_is_loaded:
+                print("\n--- Exporting Document Structure to JSON ---")
+                json_output = controller.get_chapter_model_as_json()
+                if json_output:
+                    print(json_output)
+                    # Optionally, ask to save to a file:
+                    # save_to_file = input("Save to file? (e.g., structure.json, press Enter to skip): ").strip()
+                    # if save_to_file:
+                    #     try:
+                    #         with open(save_to_file, 'w', encoding='utf-8') as f:
+                    #             f.write(json_output)
+                    #         print(f"  Successfully saved to {save_to_file}")
+                    #     except Exception as e:
+                    #         print(f"  Error saving JSON to file: {e}")
+                else:
+                    print("  Could not generate JSON output.")
+                print("------------------------------------------")
+            else:
+                print("  Please load a document first.")
+
+        elif choice == "11":  # Save Document (was 9, then 10)
             if document_is_loaded:
                 output_file = input(
                     "Enter output filepath (e.g., day_03_chapter_01_updated.md): "
