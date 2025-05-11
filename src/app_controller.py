@@ -24,10 +24,10 @@ class AppController:
         self.current_selected_panel_id = None
         self.last_listed_targetable_sections = []
         if self.doc_model.load_and_process(filepath):
-            print("INFO: Controller: Document loaded and processed successfully.")
+            # Message is now in model's load_and_process
             return True
         else:
-            print("ERROR: Controller: Failed to load or process document.")
+            # Message is now in model's load_and_process
             self.doc_model = None
             return False
 
@@ -49,9 +49,7 @@ class AppController:
             print("ERROR: No document loaded.")
             return False
         panel = self.doc_model.get_panel_by_number(panel_doc_number)
-        if (
-            panel and panel.panel_number_in_doc is not None
-        ):  # Ensure panel_number_in_doc is not None
+        if panel and panel.panel_number_in_doc is not None:
             self.current_selected_panel_id = panel.panel_number_in_doc
             print(
                 f"INFO: Controller: Selected Panel ID {panel.panel_number_in_doc} ('{panel.panel_title_text}')"
@@ -85,15 +83,17 @@ class AppController:
         return self.doc_model.list_h3_sections_in_panel(panel)
 
     def list_and_get_h3_content_for_cli(
-        self,
-        h3_list_selection_number: int,  # This is the 1-based number from the CLI list
+        self, h3_list_selection_number: int
     ) -> Optional[str]:
         if not self.doc_model or self.current_selected_panel_id is None:
             print("ERROR: No panel selected.")
             return None
         panel = self.doc_model.get_panel_by_number(self.current_selected_panel_id)
         if not panel:
-            return "Error: Selected panel not found."
+            print(
+                f"ERROR: Selected panel (ID: {self.current_selected_panel_id}) not found."
+            )
+            return "Error: Selected panel not found."  # Return error string
 
         h3_options = self.doc_model.list_h3_sections_in_panel(panel)
         if not h3_options or not (0 < h3_list_selection_number <= len(h3_options)):
@@ -102,8 +102,13 @@ class AppController:
             )
             return None
 
-        # The "number" field in h3_options IS the h3_number_in_panel
         actual_h3_id_in_panel = h3_options[h3_list_selection_number - 1].get("number")
+        if actual_h3_id_in_panel is None:
+            print(
+                f"ERROR: H3 list item {h3_list_selection_number} is missing its ID ('number' field)."
+            )
+            return None
+
         h3_pydantic_object = self.doc_model.get_h3_by_number(
             panel, actual_h3_id_in_panel
         )
@@ -149,22 +154,24 @@ class AppController:
     def prepare_multiple_selected_sections_for_api(
         self, display_numbers: List[int], common_prompt: str = "Analyze:"
     ) -> List[Dict[str, Any]]:
-        # ... (Implementation from app_controller_feedback_v2 is fine) ...
         if not self.doc_model:
             print("ERROR: No document loaded.")
             return []
         if self.current_selected_panel_id is None:
             print("ERROR: No panel selected.")
             return []
+        # list_targetable_sections_in_selected_panel_for_cli should be called first by CLI to populate this
         if not self.last_listed_targetable_sections:
-            print("ERROR: Targetable sections not listed for current panel.")
+            print(
+                "ERROR: Targetable sections not listed for current panel. Please list them first."
+            )
             return []
 
         prepared_data = []
         for num in display_numbers:
             target_info = self._get_target_info_from_display_number(num)
             if not target_info:
-                continue
+                continue  # Error already printed by helper
 
             content_md = self.doc_model.get_section_markdown_for_api(
                 panel_id=target_info["panel_id"],
@@ -192,7 +199,7 @@ class AppController:
                 )
             else:
                 print(
-                    f"WARNING: Could not retrieve content for selection {num} ('{target_info['title']}'). Skipping."
+                    f"WARNING: Could not retrieve content for selection {num} ('{target_info['title']}'). Skipping. Reason: {content_md}"
                 )
 
         print(f"INFO: --- Prepared {len(prepared_data)} section(s) for API calls. ---")
@@ -201,7 +208,6 @@ class AppController:
     def update_target_section_content(
         self, display_number: int, new_markdown_content: str
     ) -> bool:
-        # ... (Implementation from app_controller_feedback_v2 is fine) ...
         if not self.doc_model:
             print("ERROR: No document loaded.")
             return False
@@ -209,7 +215,7 @@ class AppController:
         if not target_info:
             return False
 
-        return self.doc_model.update_target_content(
+        success = self.doc_model.update_target_content(
             panel_id=target_info["panel_id"],
             new_markdown_content=new_markdown_content,
             h3_id_in_panel=target_info.get("h3_id"),
@@ -218,11 +224,17 @@ class AppController:
                 "is_initial_content_for_h3", False
             ),
         )
+        if success:
+            print(
+                f"INFO: Content for '{target_info['title']}' (Type: {target_info['type']}) updated in model."
+            )
+        else:
+            print(f"ERROR: Failed to update content for '{target_info['title']}'.")
+        return success
 
     def add_to_target_section_content(
         self, display_number: int, new_markdown_content: str, position: str = "end"
     ) -> bool:
-        # ... (Implementation from app_controller_feedback_v2 is fine) ...
         if not self.doc_model:
             print("ERROR: No document loaded.")
             return False
@@ -236,7 +248,7 @@ class AppController:
             )
             return False
 
-        return self.doc_model.add_content_to_target(
+        success = self.doc_model.add_content_to_target(
             panel_id=target_info["panel_id"],
             new_markdown_content=new_markdown_content,
             position=position,
@@ -246,22 +258,28 @@ class AppController:
                 "is_initial_content_for_h3", False
             ),
         )
+        if success:
+            print(
+                f"INFO: Content added to '{target_info['title']}' (Type: {target_info['type']}, Position: {position}) in model."
+            )
+        else:
+            print(f"ERROR: Failed to add content for '{target_info['title']}'.")
+        return success
 
     def get_h3_section_diff_text(
         self, panel_id: int, h3_id_in_panel: int
     ) -> Optional[str]:
-        # ... (Implementation from app_controller_feedback_v2 is fine) ...
         if not self.doc_model:
             print("ERROR: No document loaded.")
             return None
 
         panel = self.doc_model.get_panel_by_number(panel_id)
         if not panel:
-            return f"Error: Panel ID {panel_id} not found."
+            return f"ERROR: Panel ID {panel_id} not found."
 
         h3_section = self.doc_model.get_h3_by_number(panel, h3_id_in_panel)
         if not h3_section:
-            return f"Error: H3 ID {h3_id_in_panel} not found in Panel ID {panel_id}."
+            return f"ERROR: H3 ID {h3_id_in_panel} not found in Panel ID {panel_id}."
 
         if h3_section.api_improved_markdown is None:
             return f"INFO: H3 section '{h3_section.heading_text}' (ID: {h3_id_in_panel}) has no API-improved content to compare."
@@ -273,7 +291,7 @@ class AppController:
             h3_section.original_full_markdown, h3_section.api_improved_markdown
         )
 
-    def process_api_enhancements_for_h3(  # This is for the general H3 enhancement by ID
+    def process_api_enhancements_for_h3(
         self,
         panel_id: int,
         h3_id_in_panel: int,
@@ -281,40 +299,51 @@ class AppController:
         recommendation: Optional[str] = None,
         reason: Optional[str] = None,
     ) -> bool:
-        # ... (Implementation from app_controller_feedback_v2 is fine) ...
         if not self.doc_model:
             print("ERROR: No document loaded.")
             return False
 
-        success = self.doc_model.update_h3_section_with_improved_markdown(
+        # First, update the H3 section with the improved markdown content
+        success_update_md = self.doc_model.update_h3_section_with_improved_markdown(
             panel_id, h3_id_in_panel, improved_markdown
         )
-        if success and (recommendation or reason):
-            self.doc_model.update_h3_section_with_api_suggestions(
-                panel_id,
-                h3_id_in_panel,
-                should_enhance=True,
-                enhancement_type=recommendation,
-                enhancement_reason=reason,
+        if not success_update_md:
+            print(
+                f"ERROR: Controller: Failed to store improved markdown for H3 ID {h3_id_in_panel}."
             )
+            return False  # Stop if markdown update failed
 
-        if success:
-            panel_obj = self.doc_model.get_panel_by_number(panel_id)
-            h3_obj = (
-                self.doc_model.get_h3_by_number(panel_obj, h3_id_in_panel)
-                if panel_obj
-                else None
+        # Then, if recommendation or reason are provided, update the suggestion fields
+        if recommendation or reason:
+            success_update_suggestions = (
+                self.doc_model.update_h3_section_with_api_suggestions(
+                    panel_id,
+                    h3_id_in_panel,
+                    should_enhance=True,  # Implied, as we have improved_markdown
+                    enhancement_type=recommendation,
+                    enhancement_reason=reason,
+                )
             )
-            h3_title = h3_obj.heading_text if h3_obj else f"ID {h3_id_in_panel}"
-            panel_title = panel_obj.panel_title_text if panel_obj else f"ID {panel_id}"
-            print(
-                f"INFO: Controller: API enhancement for H3 '{h3_title}' in Panel '{panel_title}' recorded."
-            )
-        else:
-            print(
-                f"ERROR: Controller: Failed to record API enhancement for H3 ID {h3_id_in_panel}."
-            )
-        return success
+            if not success_update_suggestions:
+                print(
+                    f"WARNING: Controller: Stored improved markdown for H3 ID {h3_id_in_panel}, but failed to store suggestion details."
+                )
+                # Continue, as the main content was updated.
+
+        # Retrieve panel and H3 objects for logging purposes
+        panel_obj = self.doc_model.get_panel_by_number(panel_id)
+        h3_obj = (
+            self.doc_model.get_h3_by_number(panel_obj, h3_id_in_panel)
+            if panel_obj
+            else None
+        )
+
+        h3_title = h3_obj.heading_text if h3_obj else f"ID {h3_id_in_panel}"
+        panel_title = panel_obj.panel_title_text if panel_obj else f"ID {panel_id}"
+        print(
+            f"INFO: Controller: API enhancement for H3 '{h3_title}' in Panel '{panel_title}' recorded in model."
+        )
+        return True
 
     # --- New Method for Targeted Enhancement Pipeline ---
     def enhance_structured_panel_sections(self, panel_id: int) -> bool:
@@ -334,37 +363,33 @@ class AppController:
             f"\nINFO: Starting targeted enhancement for Panel ID {panel_id} ('{panel_obj.panel_title_text}')."
         )
 
-        # 1. Extract predefined named sections from the panel
-        # section_map is Dict[str (H3_title), str (H3_original_full_markdown)]
         section_map = self.doc_model.extract_named_sections_from_panel(panel_id)
 
-        if not section_map or not any(
-            section_map.values()
-        ):  # Check if any content was extracted
+        if not section_map or not any(section_map.values()):
             print(
-                f"INFO: No predefined named sections found or all are empty in Panel ID {panel_id}. Nothing to enhance."
+                f"INFO: No predefined named sections with content found in Panel ID {panel_id}. Nothing to enhance."
             )
-            return True  # Considered successful as there's nothing to do
+            return True
 
-        # 2. Prepare context and filter sections for API suggestion call
-        # Context could be the panel title, or a combination of key sections like Scene Description & Teaching Narrative
         panel_context_for_suggestions = f"## {panel_obj.panel_title_text}\n"
-        if section_map.get("Scene Description"):  # Use .get() for safety
-            panel_context_for_suggestions += section_map["Scene Description"] + "\n\n"
-        if section_map.get("Teaching Narrative"):
-            panel_context_for_suggestions += section_map["Teaching Narrative"] + "\n\n"
+        # Use .get() for safety, and check if the content is non-empty before adding
+        scene_desc_content = section_map.get("Scene Description", "")
+        if scene_desc_content.strip():
+            panel_context_for_suggestions += scene_desc_content + "\n\n"
 
-        # Filter out sections that are empty before sending for suggestions
-        # The keys in sections_to_suggest_for are the H3 titles.
+        teaching_narr_content = section_map.get("Teaching Narrative", "")
+        if teaching_narr_content.strip():
+            panel_context_for_suggestions += teaching_narr_content + "\n\n"
+
         sections_to_suggest_for: Dict[str, str] = {
             title: md_content
             for title, md_content in section_map.items()
-            if md_content and md_content.strip()  # Ensure there's actual content
+            if md_content and md_content.strip()
         }
 
         if not sections_to_suggest_for:
             print(
-                f"INFO: All predefined named sections in Panel ID {panel_id} are empty. Nothing to send for suggestions."
+                f"INFO: All predefined named sections in Panel ID {panel_id} are effectively empty. Nothing to send for suggestions."
             )
             return True
 
@@ -372,8 +397,6 @@ class AppController:
             f"INFO: Getting enhancement suggestions for {len(sections_to_suggest_for)} named sections in Panel ID {panel_id}..."
         )
 
-        # Call OpenAI service for suggestions
-        # suggestions_from_api is Dict[str (H3_title), Dict[str, Any (enhance, recommendation, reason)]]
         suggestions_from_api = openai_service.get_enhancement_suggestions_for_panel_h3s(
             panel_title=panel_obj.panel_title_text,
             panel_context_markdown=panel_context_for_suggestions.strip(),
@@ -382,53 +405,48 @@ class AppController:
 
         if not suggestions_from_api:
             print(f"WARNING: No suggestions received from API for Panel ID {panel_id}.")
-            # Still return True as the process itself didn't fail, just no suggestions.
             return True
 
-        enhancements_made = False
-        # 3. Iterate through suggestions and improve sections if needed
+        enhancements_made_count = 0
         for section_h3_title, suggestion_details in suggestions_from_api.items():
-            if (
-                section_h3_title not in sections_to_suggest_for
-            ):  # Should not happen if API keys on title
+            if section_h3_title not in sections_to_suggest_for:
                 print(
-                    f"WARNING: Suggestion received for unknown section '{section_h3_title}'. Skipping."
+                    f"WARNING: Suggestion received for unknown or filtered section '{section_h3_title}'. Skipping."
                 )
                 continue
 
             original_section_content = sections_to_suggest_for[section_h3_title]
-
-            # Update the H3Pydantic object with the suggestion details first
-            # Find the H3Pydantic object by title to update its suggestion fields
-            target_h3_obj_for_suggestion_update: Optional[H3Pydantic] = None
-            for h3_obj_iter in panel_obj.h3_sections:
-                if h3_obj_iter.heading_text.strip() == section_h3_title:
-                    target_h3_obj_for_suggestion_update = h3_obj_iter
+            target_h3_obj_for_update: Optional[H3Pydantic] = None
+            for h3_iter in panel_obj.h3_sections:
+                if h3_iter.heading_text.strip() == section_h3_title:
+                    target_h3_obj_for_update = h3_iter
                     break
 
-            if target_h3_obj_for_suggestion_update:
-                self.doc_model.update_h3_section_with_api_suggestions(
-                    panel_id=panel_id,
-                    h3_id_in_panel=target_h3_obj_for_suggestion_update.h3_number_in_panel,
-                    should_enhance=suggestion_details.get("enhance"),
-                    enhancement_type=suggestion_details.get("recommendation"),
-                    enhancement_reason=suggestion_details.get("reason"),
-                )
-            else:  # Should not happen if section_map keys are valid H3 titles
+            if not target_h3_obj_for_update:
                 print(
-                    f"WARNING: Could not find H3Pydantic object for '{section_h3_title}' to store suggestions."
+                    f"WARNING: Could not find matching H3Pydantic object for '{section_h3_title}' to store suggestions/updates."
                 )
+                continue
 
-            if suggestion_details.get("enhance"):  # Check boolean directly
+            # Store suggestion details in the H3Pydantic object
+            self.doc_model.update_h3_section_with_api_suggestions(
+                panel_id=panel_id,
+                h3_id_in_panel=target_h3_obj_for_update.h3_number_in_panel,
+                should_enhance=suggestion_details.get("enhance"),  # This is a boolean
+                enhancement_type=suggestion_details.get("recommendation"),
+                enhancement_reason=suggestion_details.get("reason"),
+            )
+
+            if suggestion_details.get("enhance"):
                 recommendation = suggestion_details.get("recommendation")
                 reason = suggestion_details.get("reason")
 
                 print(
-                    f"\nINFO: Enhancing named section '{section_h3_title}' in Panel ID {panel_id} (Suggestion: {recommendation})"
+                    f"\nINFO: Enhancing named section '{section_h3_title}' in Panel ID {panel_id} (Suggestion: {recommendation or 'N/A'})"
                 )
 
                 improved_content_md = openai_service.get_improved_markdown_for_section(
-                    original_h3_markdown_content=original_section_content,  # This is the full original H3 MD
+                    original_h3_markdown_content=original_section_content,
                     enhancement_type=recommendation,
                     enhancement_reason=reason,
                     panel_title_context=panel_obj.panel_title_text,
@@ -436,72 +454,76 @@ class AppController:
                 )
 
                 if improved_content_md is not None:
-                    # Use the model's method to update the named section (which sets api_improved_markdown)
+                    # Use the model's method that updates api_improved_markdown by H3 title
                     if self.doc_model.update_named_section_in_panel(
                         panel_id, section_h3_title, improved_content_md
                     ):
                         print(
                             f"INFO: Successfully stored enhanced content for '{section_h3_title}' in Panel ID {panel_id}."
                         )
-                        enhancements_made = True
+                        enhancements_made_count += 1
                     else:
                         print(
                             f"ERROR: Failed to store enhanced content for '{section_h3_title}' in Panel ID {panel_id}."
                         )
                 else:
                     print(
-                        f"INFO: No improvement generated by API for '{section_h3_title}'."
+                        f"INFO: No improvement generated by API for '{section_h3_title}'. Original content preserved for this section."
                     )
             else:
                 print(
-                    f"INFO: Skipping enhancement for named section '{section_h3_title}' – no enhancement suggested."
+                    f"INFO: Skipping enhancement for named section '{section_h3_title}' – no enhancement suggested by API."
                 )
 
-        if enhancements_made:
+        if enhancements_made_count > 0:
             print(
-                f"INFO: Targeted enhancement process completed for Panel ID {panel_id}. Some sections were updated."
+                f"INFO: Targeted enhancement process completed for Panel ID {panel_id}. {enhancements_made_count} section(s) were updated with API improvements."
             )
         else:
             print(
-                f"INFO: Targeted enhancement process completed for Panel ID {panel_id}. No sections were enhanced."
+                f"INFO: Targeted enhancement process completed for Panel ID {panel_id}. No sections were enhanced based on API suggestions."
             )
         return True
 
     def get_chapter_model_as_json(self) -> Optional[str]:
-        # ... (Implementation from app_controller_feedback_v2 is fine) ...
         if not self.doc_model or not self.doc_model.chapter_model:
-            print("Error: No document loaded or chapter model not built.")
+            print("ERROR: No document loaded or chapter model not built.")
             return None
         try:
+            # Pydantic v2+ .model_dump() is preferred
             chapter_dict = self.doc_model.chapter_model.model_dump(exclude_none=True)
 
-            def clean_dict(d):
-                if isinstance(d, dict):
+            def clean_dict_for_json(d_item: Any) -> Any:
+                if isinstance(d_item, dict):
                     return {
-                        k: clean_dict(v)
-                        for k, v in d.items()
-                        if not k.startswith("mistletoe_")
+                        k: clean_dict_for_json(v)
+                        for k, v in d_item.items()
+                        if not k.startswith("mistletoe_")  # Exclude Mistletoe objects
                     }
-                elif isinstance(d, list):
-                    return [clean_dict(i) for i in d]
-                return d
+                elif isinstance(d_item, list):
+                    return [clean_dict_for_json(i) for i in d_item]
+                return d_item  # Primitives, Pydantic models (if not excluded by key)
 
-            cleaned_chapter_dict = clean_dict(chapter_dict)
-            import json
+            cleaned_chapter_dict = clean_dict_for_json(chapter_dict)
+
+            import json  # Standard library
 
             return json.dumps(cleaned_chapter_dict, indent=2)
-        except AttributeError:  # Fallback for Pydantic v1
+
+        except AttributeError:
+            print(
+                f"WARNING: Using basic Pydantic .json() export (likely Pydantic v1). Mistletoe objects might be included or cause errors."
+            )
             try:
-                return self.doc_model.chapter_model.json(indent=2)
+                return self.doc_model.chapter_model.json(indent=2)  # Pydantic v1
             except Exception as json_err:
-                print(f"Error during JSON export: {json_err}")
-                return f'{{"error": "Could not serialize chapter model to JSON: {json_err}"}}'
+                print(f"ERROR: Error during Pydantic v1 JSON export: {json_err}")
+                return f'{{"error": "Could not serialize chapter model to JSON (v1 attempt): {json_err}"}}'
         except Exception as e:
-            print(f"Error during JSON export: {e}")
+            print(f"ERROR: Unexpected error during JSON export: {e}")
             return f'{{"error": "Could not serialize chapter model to JSON: {e}"}}'
 
     def save_document(self, output_filepath: str) -> bool:
-        # ... (Implementation from app_controller_feedback_v2 is fine) ...
         if not self.doc_model:
             print("ERROR: No document loaded to save.")
             return False
