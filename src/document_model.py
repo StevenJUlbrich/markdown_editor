@@ -2,17 +2,10 @@
 from typing import Any, List, Optional, Union
 
 from mistletoe import Document
-from mistletoe.block_token import (  # Base class for Mistletoe blocks
-    BlockToken,
-    Heading,
-    Paragraph,
-)
+from mistletoe.block_token import BlockToken, Heading, Paragraph
 from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.span_token import RawText
-from pydantic import (  # Ensure pydantic is installed: pip install pydantic / conda install pydantic
-    BaseModel,
-    Field,
-)
+from pydantic import BaseModel, Field
 
 
 # --- Helper Function ---
@@ -29,14 +22,24 @@ def get_heading_text(heading_node: Heading) -> str:
 def render_blocks_to_markdown(
     blocks: List[BlockToken], renderer: Optional[MarkdownRenderer] = None
 ) -> str:
-    """Renders a list of Mistletoe block tokens to a Markdown string."""
+    """Renders a list of Mistletoe block tokens to a Markdown string, filtering out None values."""
     if not blocks:
         return ""
-    # Create a temporary Document to render these blocks
-    temp_doc = Document("")
-    temp_doc.children = blocks  # Assign the already parsed blocks
 
-    # Use provided renderer or create a new one
+    # Filter out any None values from the blocks list before assigning
+    valid_blocks = [b for b in blocks if b is not None and isinstance(b, BlockToken)]
+    if not valid_blocks:  # If filtering results in an empty list
+        # print("Warning: render_blocks_to_markdown received no valid blocks after filtering.")
+        return ""
+
+    temp_doc = Document("")
+    try:
+        temp_doc.children = valid_blocks  # Assign only valid blocks
+    except Exception as e:
+        print(f"Error assigning children in render_blocks_to_markdown: {e}")
+        print(f"Problematic valid_blocks (first 5): {valid_blocks[:5]}")
+        return "Error: Could not render blocks."
+
     active_renderer = renderer if renderer else MarkdownRenderer()
     return active_renderer.render(temp_doc).strip()
 
@@ -46,27 +49,22 @@ class H4Pydantic(BaseModel):
     """Represents an H4 sub-sub-section."""
 
     heading_text: str
-    mistletoe_h4_block: Any  # Stores the Mistletoe Heading object for H4
-    # Content directly under this H4, rendered as a Markdown string
+    mistletoe_h4_block: Optional[Any] = (
+        None  # Stores the Mistletoe Heading object for H4
+    )
     content_markdown: str = ""
-    # Original Mistletoe blocks for content under this H4 (excluding H4 heading itself)
-    # content_mistletoe_blocks: List[Any] = Field(default_factory=list) # Optional: if needed for very granular ops
 
 
 class H3Pydantic(BaseModel):
     """Represents an H3 sub-section within a Panel."""
 
     heading_text: str
-    mistletoe_h3_block: Any  # Stores the Mistletoe Heading object for H3
-
-    # Markdown content directly under H3, before any H4s
+    mistletoe_h3_block: Optional[Any] = (
+        None  # Stores the Mistletoe Heading object for H3
+    )
     initial_content_markdown: str = ""
     h4_sections: List[H4Pydantic] = Field(default_factory=list)
-
-    # The complete original Markdown for this entire H3 section (H3 heading + initial_content + all H4s)
     original_full_markdown: str = ""
-
-    # For OpenAI enhancements
     api_improved_markdown: Optional[str] = None
     api_recommendation: Optional[str] = None
     api_reason: Optional[str] = None
@@ -75,27 +73,26 @@ class H3Pydantic(BaseModel):
 class PanelPydantic(BaseModel):
     """Represents an H2 Panel section."""
 
-    panel_title_text: str  # e.g., "Panel 1: Why Traditional Metrics Fail"
-    mistletoe_h2_block: Any  # Stores the Mistletoe Heading object for H2
+    panel_title_text: str
+    mistletoe_h2_block: Optional[Any] = (
+        None  # Stores the Mistletoe Heading object for H2
+    )
     h3_sections: List[H3Pydantic] = Field(default_factory=list)
 
 
 class GenericContentPydantic(BaseModel):
     """Represents a block of generic content (not part of a Panel)."""
 
-    # All generic blocks rendered together as a single Markdown string
     content_markdown: str
-    # Original Mistletoe blocks for this generic section
-    # mistletoe_blocks: List[Any] = Field(default_factory=list) # Optional
+    # Storing original blocks can avoid re-parsing during reconstruction
+    mistletoe_blocks: List[Any] = Field(default_factory=list)
 
 
 class ChapterPydantic(BaseModel):
     """Represents the entire chapter document."""
 
-    chapter_title_text: str  # e.g., "Chapter 1: Fundamentals of SRE Metrics"
-    mistletoe_h1_block: Optional[Any] = (
-        None  # Stores the Mistletoe Heading object for H1
-    )
+    chapter_title_text: str
+    mistletoe_h1_block: Optional[Any] = None
     document_elements: List[Union[GenericContentPydantic, PanelPydantic]] = Field(
         default_factory=list
     )
@@ -106,8 +103,8 @@ class MarkdownDocument:
     def __init__(self, filepath: Optional[str] = None):
         self.filepath: Optional[str] = filepath
         self.raw_content: Optional[str] = None
-        self.mistletoe_doc: Optional[Document] = None  # Root Mistletoe AST
-        self.chapter_model: Optional[ChapterPydantic] = None  # Parsed Pydantic model
+        self.mistletoe_doc: Optional[Document] = None
+        self.chapter_model: Optional[ChapterPydantic] = None
         self.renderer: MarkdownRenderer = MarkdownRenderer()
 
         if filepath:
@@ -155,18 +152,13 @@ class MarkdownDocument:
         chapter_h1_block_node: Optional[Heading] = None
         chapter_title = "Untitled Chapter"
 
-        # Find Chapter H1 first
         first_block = self.mistletoe_doc.children[0]
         if isinstance(first_block, Heading) and first_block.level == 1:
             chapter_h1_block_node = first_block
             chapter_title = get_heading_text(chapter_h1_block_node)
-            # Consider if H1 should be part of generic_blocks or handled separately
-            # For now, let's assume H1 is the chapter title and other content follows.
-            # If H1 is the *only* content, it will be handled by trailing generic blocks.
-        else:  # No H1, add first block to generic content
+        else:
             current_generic_blocks.append(first_block)
 
-        # Process blocks starting from the second block if H1 was found, else from first
         start_index = 1 if chapter_h1_block_node else 0
         all_top_level_blocks = self.mistletoe_doc.children
         current_block_index = start_index
@@ -181,7 +173,7 @@ class MarkdownDocument:
                 heading_text = get_heading_text(block)
                 if heading_text.startswith("Panel "):
                     is_h2_panel_heading = True
-                    panel_title_text = heading_text  # Full title like "Panel 1: Why..."
+                    panel_title_text = heading_text
                     panel_h2_block_node = block
 
             if is_h2_panel_heading and panel_h2_block_node:
@@ -190,12 +182,15 @@ class MarkdownDocument:
                         current_generic_blocks, self.renderer
                     )
                     doc_elements.append(
-                        GenericContentPydantic(content_markdown=generic_md)
+                        GenericContentPydantic(
+                            content_markdown=generic_md,
+                            mistletoe_blocks=list(current_generic_blocks),
+                        )
                     )
                     current_generic_blocks = []
 
                 panel_content_blocks_for_h3s: List[BlockToken] = []
-                current_block_index += 1  # Move past the H2 heading
+                current_block_index += 1
 
                 while current_block_index < len(all_top_level_blocks):
                     next_block_in_panel = all_top_level_blocks[current_block_index]
@@ -221,15 +216,20 @@ class MarkdownDocument:
                         h3_sections=panel_h3_sections,
                     )
                 )
-            else:  # Generic content
+            else:
                 current_generic_blocks.append(block)
                 current_block_index += 1
 
-        if current_generic_blocks:  # Add any trailing generic blocks
+        if current_generic_blocks:
             generic_md = render_blocks_to_markdown(
                 current_generic_blocks, self.renderer
             )
-            doc_elements.append(GenericContentPydantic(content_markdown=generic_md))
+            doc_elements.append(
+                GenericContentPydantic(
+                    content_markdown=generic_md,
+                    mistletoe_blocks=list(current_generic_blocks),
+                )
+            )
 
         self.chapter_model = ChapterPydantic(
             chapter_title_text=chapter_title,
@@ -245,18 +245,12 @@ class MarkdownDocument:
         self, panel_content_blocks: List[BlockToken]
     ) -> List[H3Pydantic]:
         h3_pydantic_list: List[H3Pydantic] = []
-        current_h3_associated_blocks: List[BlockToken] = (
-            []
-        )  # Blocks for the current H3 (its heading + content)
+        current_h3_content_blocks_for_h4s: List[BlockToken] = []
         active_h3_title = "Initial Content"
         active_h3_block_node: Optional[Heading] = None
 
-        # These collect blocks *between* H3 headings, or before the first H3
-        current_h3_content_blocks_for_h4s: List[BlockToken] = []
-
-        if not panel_content_blocks:  # Handle panel with no H3s (only H2)
-            # Create an "Initial Content" H3 section for the panel
-            full_h3_md = ""  # Empty initial content
+        if not panel_content_blocks:
+            full_h3_md = ""
             h3_pydantic_list.append(
                 H3Pydantic(
                     heading_text=active_h3_title,
@@ -277,10 +271,8 @@ class MarkdownDocument:
                 is_h3_heading = True
 
             if is_h3_heading:
-                # Finalize previous H3 section (if any)
-                if (
-                    active_h3_block_node
-                    or active_h3_title == "Initial Content"
+                if active_h3_block_node or (
+                    active_h3_title == "Initial Content"
                     and current_h3_content_blocks_for_h4s
                 ):
                     initial_md_for_prev_h3, h4s_for_prev_h3 = (
@@ -288,27 +280,15 @@ class MarkdownDocument:
                             current_h3_content_blocks_for_h4s
                         )
                     )
-
-                    # Construct original_full_markdown for the previous H3 section
-                    temp_h3_blocks_for_render = []
-                    if active_h3_block_node:
-                        temp_h3_blocks_for_render.append(active_h3_block_node)
-                    # Need to render initial_md_for_prev_h3 (if it's already md) or its source blocks
-                    # For now, assume initial_md_for_prev_h3 is markdown.
-                    # And h4s_for_prev_h3 contains H4Pydantic objects.
-                    # This part needs careful block assembly for original_full_markdown
-
-                    # To get original_full_markdown: assemble Mistletoe blocks and render
                     all_blocks_for_this_h3_section = []
                     if active_h3_block_node:
                         all_blocks_for_this_h3_section.append(active_h3_block_node)
                     all_blocks_for_this_h3_section.extend(
                         current_h3_content_blocks_for_h4s
-                    )  # These are the blocks passed to parse_h4
+                    )
                     full_h3_md = render_blocks_to_markdown(
                         all_blocks_for_this_h3_section, self.renderer
                     )
-
                     h3_pydantic_list.append(
                         H3Pydantic(
                             heading_text=active_h3_title,
@@ -318,26 +298,20 @@ class MarkdownDocument:
                             original_full_markdown=full_h3_md,
                         )
                     )
-
-                # Start new H3 section
-                active_h3_block_node = block  # This is an H3 Heading object
+                active_h3_block_node = block
                 active_h3_title = get_heading_text(active_h3_block_node)
-                current_h3_content_blocks_for_h4s = []  # Reset for content under new H3
+                current_h3_content_blocks_for_h4s = []
                 block_idx += 1
             else:
                 current_h3_content_blocks_for_h4s.append(block)
                 block_idx += 1
 
-        # Add the last H3 section
-        if (
-            active_h3_block_node or current_h3_content_blocks_for_h4s
-        ):  # If there was any content at all for the last H3 section
+        if active_h3_block_node or current_h3_content_blocks_for_h4s:
             initial_md_for_last_h3, h4s_for_last_h3 = (
                 self._parse_h4_sections_from_h3_blocks(
                     current_h3_content_blocks_for_h4s
                 )
             )
-
             all_blocks_for_this_h3_section = []
             if active_h3_block_node:
                 all_blocks_for_this_h3_section.append(active_h3_block_node)
@@ -345,7 +319,6 @@ class MarkdownDocument:
             full_h3_md = render_blocks_to_markdown(
                 all_blocks_for_this_h3_section, self.renderer
             )
-
             h3_pydantic_list.append(
                 H3Pydantic(
                     heading_text=active_h3_title,
@@ -363,8 +336,6 @@ class MarkdownDocument:
         h4_pydantic_list: List[H4Pydantic] = []
         current_h4_content_blocks: List[BlockToken] = []
         initial_content_for_h3_blocks: List[BlockToken] = []
-
-        active_h4_title = "Initial Content H4"  # Should not be used if H4 found
         active_h4_block_node: Optional[Heading] = None
         is_before_first_h4 = True
 
@@ -380,40 +351,37 @@ class MarkdownDocument:
                 is_h4_heading = True
 
             if is_h4_heading:
-                is_before_first_h4 = False  # We've encountered the first H4
-                # Finalize previous H4 section (if any)
-                if active_h4_block_node:  # If there was a previous H4
+                is_before_first_h4 = False
+                if active_h4_block_node:
                     h4_content_md = render_blocks_to_markdown(
                         current_h4_content_blocks, self.renderer
                     )
                     h4_pydantic_list.append(
                         H4Pydantic(
-                            heading_text=active_h4_title,
+                            heading_text=get_heading_text(
+                                active_h4_block_node
+                            ),  # Get text from the node
                             mistletoe_h4_block=active_h4_block_node,
                             content_markdown=h4_content_md,
                         )
                     )
-
-                # Start new H4 section
-                active_h4_block_node = block  # This is an H4 Heading object
-                active_h4_title = get_heading_text(active_h4_block_node)
-                current_h4_content_blocks = []  # Reset for content under new H4
+                active_h4_block_node = block
+                current_h4_content_blocks = []
                 block_idx += 1
             else:
                 if is_before_first_h4:
                     initial_content_for_h3_blocks.append(block)
-                else:  # Content for the current H4
+                else:
                     current_h4_content_blocks.append(block)
                 block_idx += 1
 
-        # Add the last H4 section's content or if no H4s, all content is initial
-        if active_h4_block_node:  # If at least one H4 was processed
+        if active_h4_block_node:
             h4_content_md = render_blocks_to_markdown(
                 current_h4_content_blocks, self.renderer
             )
             h4_pydantic_list.append(
                 H4Pydantic(
-                    heading_text=active_h4_title,
+                    heading_text=get_heading_text(active_h4_block_node),
                     mistletoe_h4_block=active_h4_block_node,
                     content_markdown=h4_content_md,
                 )
@@ -424,7 +392,6 @@ class MarkdownDocument:
         )
         return initial_content_markdown_for_h3, h4_pydantic_list
 
-    # --- Getters for Content (to be used by Controller) ---
     def get_panel_pydantic(self, panel_title_fragment: str) -> Optional[PanelPydantic]:
         if not self.chapter_model:
             return None
@@ -462,23 +429,37 @@ class MarkdownDocument:
         h3_title: Optional[str] = None,
         h4_title: Optional[str] = None,
     ) -> Optional[str]:
-        """Gets the full Markdown for H2, H3, or H4 section for API processing."""
         panel = self.get_panel_pydantic(panel_title)
         if not panel:
             return f"Error: Panel '{panel_title}' not found."
 
-        if not h3_title:  # Target is the H2 Panel itself
+        if not h3_title:
             # Assemble full panel markdown
-            blocks_for_panel = [panel.mistletoe_h2_block]
+            blocks_for_panel = []
+            if panel.mistletoe_h2_block:  # Check if H2 block is not None
+                blocks_for_panel.append(panel.mistletoe_h2_block)
+            else:  # Should ideally not happen if panel object exists
+                print(
+                    f"Warning: Panel '{panel.panel_title_text}' Pydantic object exists but H2 Mistletoe block is missing."
+                )
+
             for h3_sec in panel.h3_sections:
-                blocks_for_panel.append(h3_sec.mistletoe_h3_block)
-                # For full H2 panel content, we need to reconstruct from H3's original_full_markdown or its parts
-                # This requires H3.original_full_markdown to NOT include the H3 heading itself if we add it above
-                # Let's assume H3.original_full_markdown is the complete H3 section content *including* its heading.
-                blocks_for_panel.extend(
-                    Document(h3_sec.original_full_markdown).children
-                    if h3_sec.original_full_markdown
-                    else []
+                # original_full_markdown for H3 includes its heading and all content (H4s etc.)
+                if h3_sec.original_full_markdown:
+                    # Parse this string back to Mistletoe blocks to append
+                    temp_h3_doc = Document(h3_sec.original_full_markdown)
+                    valid_children = [
+                        b
+                        for b in temp_h3_doc.children
+                        if b is not None and isinstance(b, BlockToken)
+                    ]
+                    blocks_for_panel.extend(valid_children)
+
+            if (
+                not blocks_for_panel and panel.mistletoe_h2_block is None
+            ):  # Only return error if truly nothing, not even H2
+                return (
+                    f"Error: Panel '{panel.panel_title_text}' has no content to render."
                 )
             return render_blocks_to_markdown(blocks_for_panel, self.renderer)
 
@@ -486,24 +467,29 @@ class MarkdownDocument:
         if not h3_section:
             return f"Error: H3 section '{h3_title}' not found in '{panel.panel_title_text}'."
 
-        if not h4_title:  # Target is the H3 section
-            return (
-                h3_section.original_full_markdown
-            )  # This should be the full H3 section MD
+        if not h4_title:
+            return h3_section.original_full_markdown
 
         h4_section_model = self.get_h4_pydantic(h3_section, h4_title)
         if not h4_section_model:
             return f"Error: H4 section '{h4_title}' not found in '{h3_section.heading_text}'."
 
-        # Return H4 heading + its content
-        h4_full_md_blocks = [h4_section_model.mistletoe_h4_block]
-        if h4_section_model.content_markdown:  # content_markdown is already a string
-            h4_full_md_blocks.extend(
-                Document(h4_section_model.content_markdown).children
-            )
+        h4_full_md_blocks = []
+        if h4_section_model.mistletoe_h4_block:  # Check if H4 block is not None
+            h4_full_md_blocks.append(h4_section_model.mistletoe_h4_block)
+        if h4_section_model.content_markdown:
+            temp_h4_content_doc = Document(h4_section_model.content_markdown)
+            valid_children = [
+                b
+                for b in temp_h4_content_doc.children
+                if b is not None and isinstance(b, BlockToken)
+            ]
+            h4_full_md_blocks.extend(valid_children)
+
+        if not h4_full_md_blocks and h4_section_model.mistletoe_h4_block is None:
+            return f"Error: H4 section '{h4_section_model.heading_text}' has no content to render."
         return render_blocks_to_markdown(h4_full_md_blocks, self.renderer)
 
-    # --- Modification Methods ---
     def update_h3_section_via_api(
         self,
         panel_title: str,
@@ -531,48 +517,213 @@ class MarkdownDocument:
         )
         return True
 
-    # update_h4_section_via_api would be similar if needed
+    def update_subsection_content(
+        self,
+        panel_title_fragment: str,
+        h3_subsection_title_fragment: str,
+        new_markdown_content: str,
+        h4_subsubsection_title_fragment: Optional[str] = None,
+    ):
+        panel = self.get_panel_pydantic(panel_title_fragment)
+        if not panel:
+            print(f"Panel '{panel_title_fragment}' not found.")
+            return False
 
-    # --- Reconstruction and Saving ---
+        h3_section = self.get_h3_pydantic(panel, h3_subsection_title_fragment)
+        if not h3_section:
+            print(f"H3 Subsection '{h3_subsection_title_fragment}' not found.")
+            return False
+
+        target_section_data_dict = None
+        target_section_name = ""
+
+        if h4_subsubsection_title_fragment:
+            for h4_s_dict_idx, h4_s_dict_val in enumerate(h3_section.h4_sections):
+                if h4_s_dict_val.heading_text == h4_subsubsection_title_fragment:
+                    target_section_data_dict = h3_section.h4_sections[
+                        h4_s_dict_idx
+                    ]  # This is H4Pydantic object
+                    target_section_name = f"H4 '{h4_subsubsection_title_fragment}'"
+                    break
+            if not target_section_data_dict:
+                print(
+                    f"H4 Sub-subsection '{h4_subsubsection_title_fragment}' not found for update."
+                )
+                return False
+
+            # Update H4Pydantic.content_markdown
+            # The new_markdown_content is the content *under* the H4 heading
+            target_section_data_dict.content_markdown = new_markdown_content
+            # Also need to update the parent H3's original_full_markdown
+            h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
+                h3_section
+            )
+
+        else:
+            # Target H3's "Initial Content"
+            h3_section.initial_content_markdown = new_markdown_content
+            # Also need to update the H3's original_full_markdown
+            h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
+                h3_section
+            )
+            target_section_name = (
+                f"H3 '{h3_subsection_title_fragment}' (Initial Content)"
+            )
+
+        print(
+            f"Successfully updated {target_section_name} in panel '{panel.panel_title_text}'."
+        )
+        return True
+
+    def add_content_to_subsection(
+        self,
+        panel_title_fragment: str,
+        h3_subsection_title_fragment: str,
+        new_markdown_content: str,
+        position: str = "end",
+        h4_subsubsection_title_fragment: Optional[str] = None,
+    ):
+        panel = self.get_panel_pydantic(panel_title_fragment)
+        if not panel:
+            print(f"Panel '{panel_title_fragment}' not found.")
+            return False
+
+        h3_section = self.get_h3_pydantic(panel, h3_subsection_title_fragment)
+        if not h3_section:
+            print(f"H3 Subsection '{h3_subsection_title_fragment}' not found.")
+            return False
+
+        target_section_data_dict = (
+            None  # H4Pydantic object or H3Pydantic for initial_content
+        )
+        target_section_name = ""
+        is_h4_target = False
+
+        if h4_subsubsection_title_fragment:
+            for h4_s_dict_idx, h4_s_dict_val in enumerate(h3_section.h4_sections):
+                if h4_s_dict_val.heading_text == h4_subsubsection_title_fragment:
+                    target_section_data_dict = h3_section.h4_sections[h4_s_dict_idx]
+                    target_section_name = f"H4 '{h4_subsubsection_title_fragment}'"
+                    is_h4_target = True
+                    break
+            if not target_section_data_dict:
+                print(
+                    f"H4 Sub-subsection '{h4_subsubsection_title_fragment}' not found for adding content."
+                )
+                return False
+        else:
+            target_section_data_dict = (
+                h3_section  # Target H3's initial_content_markdown
+            )
+            target_section_name = (
+                f"H3 '{h3_subsection_title_fragment}' (Initial Content)"
+            )
+
+        if is_h4_target and isinstance(target_section_data_dict, H4Pydantic):
+            if position == "start":
+                target_section_data_dict.content_markdown = (
+                    new_markdown_content
+                    + "\n"
+                    + target_section_data_dict.content_markdown
+                )
+            else:  # "end"
+                target_section_data_dict.content_markdown = (
+                    target_section_data_dict.content_markdown
+                    + "\n"
+                    + new_markdown_content
+                )
+        elif not is_h4_target and isinstance(target_section_data_dict, H3Pydantic):
+            if position == "start":
+                target_section_data_dict.initial_content_markdown = (
+                    new_markdown_content
+                    + "\n"
+                    + target_section_data_dict.initial_content_markdown
+                )
+            else:  # "end"
+                target_section_data_dict.initial_content_markdown = (
+                    target_section_data_dict.initial_content_markdown
+                    + "\n"
+                    + new_markdown_content
+                )
+        else:
+            print("Error: Could not determine target for adding content.")
+            return False
+
+        # Update the parent H3's original_full_markdown
+        h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
+            h3_section
+        )
+        print(
+            f"Successfully added content to {target_section_name} (position: {position}) in panel '{panel.panel_title_text}'."
+        )
+        return True
+
+    def _regenerate_h3_full_markdown(self, h3_section: H3Pydantic) -> str:
+        """Helper to reconstruct the full markdown string for an H3 section from its components."""
+        blocks_for_render = []
+        if h3_section.mistletoe_h3_block:
+            blocks_for_render.append(h3_section.mistletoe_h3_block)
+        if h3_section.initial_content_markdown:
+            # Parse the string back to blocks to ensure correct rendering relative to H4s
+            blocks_for_render.extend(
+                Document(h3_section.initial_content_markdown).children
+            )
+        for h4_s in h3_section.h4_sections:
+            if h4_s.mistletoe_h4_block:
+                blocks_for_render.append(h4_s.mistletoe_h4_block)
+            if h4_s.content_markdown:
+                blocks_for_render.extend(Document(h4_s.content_markdown).children)
+        return render_blocks_to_markdown(blocks_for_render, self.renderer)
+
     def reconstruct_and_render_document(self) -> str:
         if not self.chapter_model:
             return self.raw_content or ""
 
         all_final_blocks: List[BlockToken] = []
-        if self.chapter_model.mistletoe_h1_block:
+        if self.chapter_model.mistletoe_h1_block:  # Add H1 if it exists
             all_final_blocks.append(self.chapter_model.mistletoe_h1_block)
 
         for element in self.chapter_model.document_elements:
             if isinstance(element, GenericContentPydantic):
-                # Re-parse the stored markdown to get blocks, or store original blocks
-                # For simplicity, re-parsing. Storing original blocks in GenericContentPydantic is better.
-                if element.content_markdown:
-                    all_final_blocks.extend(Document(element.content_markdown).children)
+                # Use stored Mistletoe blocks for generic content if available
+                if element.mistletoe_blocks:
+                    all_final_blocks.extend(
+                        b
+                        for b in element.mistletoe_blocks
+                        if b is not None and isinstance(b, BlockToken)
+                    )
+                elif element.content_markdown:  # Fallback to re-parsing
+                    generic_doc = Document(element.content_markdown)
+                    all_final_blocks.extend(
+                        b
+                        for b in generic_doc.children
+                        if b is not None and isinstance(b, BlockToken)
+                    )
 
             elif isinstance(element, PanelPydantic):
-                if element.mistletoe_h2_block:
+                if element.mistletoe_h2_block:  # Add Panel H2
                     all_final_blocks.append(element.mistletoe_h2_block)
 
                 for h3_section in element.h3_sections:
                     if h3_section.api_improved_markdown is not None:
                         # API provided improved content for the whole H3 section
-                        # This improved_markdown should be a complete section including H3 heading
+                        improved_doc = Document(h3_section.api_improved_markdown)
                         all_final_blocks.extend(
-                            Document(h3_section.api_improved_markdown).children
+                            b
+                            for b in improved_doc.children
+                            if b is not None and isinstance(b, BlockToken)
                         )
                     else:
-                        # Use original H3 content (which includes H3 heading, initial content, and H4s)
+                        # Use original H3 content. original_full_markdown includes H3 heading.
                         if h3_section.original_full_markdown:
-                            all_final_blocks.extend(
-                                Document(h3_section.original_full_markdown).children
+                            original_h3_doc = Document(
+                                h3_section.original_full_markdown
                             )
-                        # Fallback if original_full_markdown wasn't properly populated (should not happen)
-                        # else:
-                        #     if h3_section.mistletoe_h3_block: all_final_blocks.append(h3_section.mistletoe_h3_block)
-                        #     if h3_section.initial_content_markdown: all_final_blocks.extend(Document(h3_section.initial_content_markdown).children)
-                        #     for h4_s in h3_section.h4_sections:
-                        #         if h4_s.mistletoe_h4_block: all_final_blocks.append(h4_s.mistletoe_h4_block)
-                        #         if h4_s.content_markdown: all_final_blocks.extend(Document(h4_s.content_markdown).children)
+                            all_final_blocks.extend(
+                                b
+                                for b in original_h3_doc.children
+                                if b is not None and isinstance(b, BlockToken)
+                            )
 
         return render_blocks_to_markdown(all_final_blocks, self.renderer)
 
