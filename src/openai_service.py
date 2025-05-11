@@ -1,5 +1,6 @@
 # openai_service.py
 import json
+import re  # Import re for more robust title extraction
 import time
 from typing import Any, Dict, List, Optional
 
@@ -16,9 +17,7 @@ class MockOpenAIClient:
 
     def __init__(self, api_key: Optional[str] = "MOCK_API_KEY"):
         self.api_key = api_key
-        print(
-            f"MockOpenAIClient initialized. (API Key: {'SET' if api_key else 'NOT SET'})"
-        )
+        # print(f"MockOpenAIClient initialized. (API Key: {'SET' if api_key else 'NOT SET'})") # Less verbose
 
     class Chat:
         class Completions:
@@ -26,84 +25,126 @@ class MockOpenAIClient:
             def create(
                 model: str, messages: List[Dict[str, str]], temperature: float, **kwargs
             ) -> Any:
-                # Simulate a delay
-                time.sleep(0.5)
+                time.sleep(0.2)  # Reduced sleep time for faster testing
 
-                user_content = messages[-1][
-                    "content"
-                ]  # Get the last message, which is the user's prompt
-                print(f"\n--- MockOpenAIClient.create called ---")
-                print(f"Model: {model}, Temperature: {temperature}")
-                # print(f"Prompt (first 200 chars): {user_content[:200]}...")
+                user_content = messages[-1]["content"]
+                print(f"\n--- MockOpenAIClient.create called (Model: {model}) ---")
 
-                # Determine response based on prompt content (very basic simulation)
-                if (
-                    "Evaluate the following sections" in user_content
-                    and "Respond in this JSON format" in user_content
-                ):
-                    # This is likely the "get_section_improvement_suggestions" call
-                    print("Simulating 'get_section_improvement_suggestions' response.")
-                    # Extract H3 section titles from the prompt to build a mock response
-                    # This is a simplified way to get the keys for the JSON response
+                # Condition for "get_section_improvement_suggestions"
+                # Making keywords more specific to the generated prompt
+                is_suggestion_prompt = (
+                    "Evaluate the following H3 sub-sections" in user_content
+                    and "provide your assessment in the following JSON format"
+                    in user_content
+                )
+                # Condition for "enhance_section"
+                is_enhancement_prompt = (
+                    "improve a specific H3 sub-section" in user_content
+                    and "Return *only* the complete, improved Markdown" in user_content
+                )
+
+                if is_suggestion_prompt:
+                    print(
+                        "MockOpenAIClient: Simulating 'get_enhancement_suggestions' response."
+                    )
+
+                    mock_suggestions: Dict[str, Dict[str, Any]] = {}
+                    # Extract H3 titles using regex from the "H3 Sub-sections to Evaluate" part
+                    # The prompt format is "## H3 Title\nContent..."
+                    # Regex to find lines starting with "## " followed by text
+                    # and not part of the overall panel context section.
+
+                    # Find the block of H3s first
+                    h3_block_match = re.search(
+                        r"H3 Sub-sections to Evaluate:\s*---(.*?)---",
+                        user_content,
+                        re.DOTALL | re.MULTILINE,
+                    )
                     h3_titles_in_prompt = []
-                    for line in user_content.splitlines():
-                        if (
-                            line.startswith("## ") and ":" not in line
-                        ):  # A simple heuristic for H3 titles in the prompt format
-                            h3_titles_in_prompt.append(line.replace("## ", "").strip())
+                    if h3_block_match:
+                        h3_block_text = h3_block_match.group(1)
+                        h3_titles_in_prompt = [
+                            line.replace("## ", "").strip()
+                            for line in h3_block_text.splitlines()
+                            if line.strip().startswith("## ")
+                        ]
 
-                    mock_suggestions = {}
-                    if not h3_titles_in_prompt:  # If parsing fails, use generic keys
+                    if not h3_titles_in_prompt:
+                        print(
+                            "MockOpenAIClient: Could not parse H3 titles from prompt for suggestions, using fallback titles."
+                        )
+                        # Fallback if parsing fails, to ensure some JSON is returned
                         h3_titles_in_prompt = [
                             "Common Example of the Problem",
                             "SRE Best Practice: Evidence-Based Investigation",
                             "Banking Impact",
+                            "Implementation Guidance",
+                            "Scene Description",
+                            "Teaching Narrative",
                         ]
 
-                    for title in h3_titles_in_prompt:
-                        # Alternate "Yes" and "No" for variety
-                        if len(mock_suggestions) % 2 == 0:
+                    for i, title in enumerate(h3_titles_in_prompt):
+                        if i % 2 == 0:  # Alternate for variety
                             mock_suggestions[title] = {
                                 "enhance": "Yes",
-                                "recommendation": "Add Example",
-                                "reason": f"A concrete example would clarify the concept for {title}.",
+                                "recommendation": "Add Diagram",
+                                "reason": f"A diagram would visually clarify the key points for '{title}'.",
                             }
                         else:
                             mock_suggestions[title] = {
                                 "enhance": "No",
                                 "recommendation": None,
-                                "reason": None,
+                                "reason": f"The section '{title}' is clear and concise as is.",
                             }
 
                     response_content = json.dumps(mock_suggestions, indent=2)
 
-                elif (
-                    "Improve it accordingly" in user_content
-                    and "Return only the new version" in user_content
-                ):
-                    # This is likely the "enhance_section" call
-                    print("Simulating 'enhance_section' response.")
-                    original_section_match = user_content.split(
-                        "Here is the original section:\n"
+                elif is_enhancement_prompt:
+                    print("MockOpenAIClient: Simulating 'enhance_section' response.")
+
+                    # Extract original H3 title from the prompt for more realistic mock
+                    original_h3_title_match = re.search(
+                        r'The H3 sub-section to improve is: "([^"]+)"', user_content
                     )
-                    original_section_text = (
-                        original_section_match[1]
-                        if len(original_section_match) > 1
-                        else "Original section content not found in prompt."
+                    original_h3_title = (
+                        original_h3_title_match.group(1)
+                        if original_h3_title_match
+                        else "Unknown Section"
+                    )
+
+                    enhancement_type_match = re.search(
+                        r"Suggested Enhancement Type: ([^\n]+)", user_content
+                    )
+                    enhancement_type = (
+                        enhancement_type_match.group(1)
+                        if enhancement_type_match
+                        else "General improvement"
+                    )
+
+                    original_section_content_match = re.search(
+                        r"Here is the original H3 sub-section content:\s*---(.*?)---",
+                        user_content,
+                        re.DOTALL | re.MULTILINE,
+                    )
+                    original_section_content_snippet = (
+                        original_section_content_match.group(1).strip()[:100]
+                        if original_section_content_match
+                        else "Original content snippet not found."
                     )
 
                     response_content = (
-                        f"### Mock Enhanced Section Title (was: {user_content.splitlines()[2].replace('- Type: ','')})\n"
-                        f"This is the **mock enhanced version** of the section.\n\n"
-                        f"Original content started with:\n{original_section_text[:100]}...\n\n"
-                        f"The recommendation was to improve it with: {user_content.splitlines()[1].replace('- Type: ','')}.\n"
-                        f"Reason: {user_content.splitlines()[2].replace('- Reason: ','')}"
+                        f"### {original_h3_title} (Enhanced Mock)\n\n"
+                        f"This is the **mock enhanced version** of the section, "
+                        f"incorporating the suggestion to '{enhancement_type}'.\n\n"
+                        f"The original content started like this: '{original_section_content_snippet}...'\n\n"
+                        f"Further improvements could include more real-world examples or a checklist."
                     )
                 else:
-                    print("Simulating a generic response.")
-                    response_content = "This is a generic mock response from OpenAI."
+                    print(
+                        "MockOpenAIClient: Simulating a generic non-JSON response (prompt not specifically matched)."
+                    )
+                    response_content = "This is a generic mock response from OpenAI because the prompt was not recognized as suggestion or enhancement."
 
-                # Simulate the structure of an OpenAI API response object
                 class MockMessage:
                     def __init__(self, content_str):
                         self.content = content_str
@@ -116,37 +157,29 @@ class MockOpenAIClient:
                     def __init__(self, content_str):
                         self.choices = [MockChoice(content_str)]
 
-                print(
-                    f"Mock response content (first 100 chars): {response_content[:100]}..."
-                )
+                # print(f"Mock response generated: {response_content[:150]}...") # For debugging
                 return MockResponse(response_content)
 
-        def __init__(self):  # To allow MockOpenAIClient.Chat.Completions.create()
+        def __init__(self):
             self.completions = self.Completions()
 
-    def __init__(
-        self, api_key: Optional[str] = "MOCK_API_KEY", **kwargs
-    ):  # For OpenAI v1.x client init
+    def __init__(self, api_key: Optional[str] = "MOCK_API_KEY", **kwargs):
         self.api_key = api_key
-        self.chat = self.Chat()  # Instantiate the inner Chat class
+        self.chat = self.Chat()
         print(
-            f"MockOpenAIClient initialized for v1.x style. (API Key: {'SET' if api_key else 'NOT SET'})"
+            f"MockOpenAIClient initialized (v1.x style). API Key: {'SET' if api_key else 'NOT SET'}"
         )
 
 
 # --- Service Functions ---
-# For testing, use the mock client. In production, use the real one.
-# MOCK_CLIENT = True # Set to False to attempt using the real OpenAI client (requires API key)
 MOCK_CLIENT = True
 
 if MOCK_CLIENT:
     client = MockOpenAIClient(api_key="FAKE_KEY_FOR_MOCK")
 else:
     try:
-        from openai import OpenAI  # type: ignore
+        from openai import OpenAI
 
-        # IMPORTANT: Replace with your actual API key loading mechanism (e.g., environment variable)
-        # Ensure the OPENAI_API_KEY environment variable is set if not using MOCK_CLIENT
         client = OpenAI()
     except ImportError:
         print("OpenAI library not found. Please install it: pip install openai")
@@ -155,35 +188,25 @@ else:
         MOCK_CLIENT = True
 
 
-MODEL_FOR_SUGGESTIONS = "gpt-4o"  # Or your preferred model
-MODEL_FOR_ENHANCEMENT = "gpt-4o"  # Or your preferred model
+MODEL_FOR_SUGGESTIONS = "gpt-4o"
+MODEL_FOR_ENHANCEMENT = "gpt-4o"
 
 
 def get_enhancement_suggestions_for_panel_h3s(
-    panel_title: str,
-    panel_context_markdown: str,  # e.g., H2 title + Scene Description + Teaching Narrative
-    h3_sections_content: Dict[str, str],  # Dict of {h3_title: h3_full_markdown_content}
+    panel_title: str, panel_context_markdown: str, h3_sections_content: Dict[str, str]
 ) -> Dict[str, Dict[str, Any]]:
-    """
-    Sends content of multiple H3 sections from a panel to OpenAI to get enhancement suggestions.
-    Args:
-        panel_title: The title of the H2 Panel.
-        panel_context_markdown: Markdown content providing overall context for the panel.
-        h3_sections_content: A dictionary where keys are H3 titles and values are their
-                             full Markdown content.
-    Returns:
-        A dictionary where keys are H3 titles and values are dictionaries
-        with "enhance" (bool), "recommendation" (str), and "reason" (str).
-    """
     if not h3_sections_content:
         return {}
 
     h3_sections_text_for_prompt = []
     for h3_title, h3_md in h3_sections_content.items():
-        # Use a simpler heading for the prompt to avoid confusion with panel H2
-        h3_sections_text_for_prompt.append(
-            f"## {h3_title}\n{h3_md.splitlines()[1:] if h3_md.startswith('###') else h3_md}"
-        )
+        # Strip the H3 heading itself if present in h3_md, as we add "## H3 Title"
+        content_without_heading = h3_md
+        if h3_md.strip().startswith(f"### {h3_title}"):
+            lines = h3_md.splitlines()
+            content_without_heading = "\n".join(lines[1:]).strip()
+
+        h3_sections_text_for_prompt.append(f"## {h3_title}\n{content_without_heading}")
 
     prompt = f"""You are a senior SRE and technical learning designer.
 You are reviewing H3 sub-sections within a larger document panel titled: "{panel_title}"
@@ -204,25 +227,25 @@ For each H3 sub-section evaluated (use its exact title as the key), provide your
 {{
   "Exact H3 Title 1": {{ "enhance": "Yes/No", "recommendation": "Type of enhancement (e.g., Add Diagram, More Examples, Checklist, Code Snippet, Table, Analogy) or null if No", "reason": "Brief justification for your recommendation or why no enhancement is needed." }},
   "Exact H3 Title 2": {{ "enhance": "Yes/No", "recommendation": "...", "reason": "..." }}
-  // ... and so on for all provided H3 sub-sections.
 }}
 
 Ensure your entire response is a single, valid JSON object.
 """
-    print(f"\n[OpenAI Service] Getting suggestions for Panel: {panel_title}")
+    print(
+        f"\n[OpenAI Service] Getting suggestions for Panel: {panel_title} (H3s: {list(h3_sections_content.keys())})"
+    )
     try:
         response = client.chat.completions.create(
             model=MODEL_FOR_SUGGESTIONS,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,  # Lower temperature for more deterministic suggestions
-            # response_format={ "type": "json_object" } # For newer models that support JSON mode
+            temperature=0.3,
+            # response_format={ "type": "json_object" } # Uncomment for newer models
         )
         raw_response_content = response.choices[0].message.content
         if not raw_response_content:
             print("[OpenAI Service] Error: Received empty response for suggestions.")
             return {}
 
-        # Attempt to clean the response if it's wrapped in markdown code block
         if raw_response_content.strip().startswith("```json"):
             raw_response_content = raw_response_content.strip()[7:]
             if raw_response_content.endswith("```"):
@@ -230,50 +253,41 @@ Ensure your entire response is a single, valid JSON object.
 
         suggestions = json.loads(raw_response_content.strip())
 
-        # Validate and convert "enhance" to boolean
         parsed_suggestions = {}
         for title, details in suggestions.items():
-            parsed_suggestions[title] = {
-                "enhance": str(details.get("enhance", "No")).lower() == "yes",
-                "recommendation": details.get("recommendation"),
-                "reason": details.get("reason"),
-            }
+            if isinstance(details, dict):  # Ensure details is a dictionary
+                parsed_suggestions[title] = {
+                    "enhance": str(details.get("enhance", "No")).lower() == "yes",
+                    "recommendation": details.get("recommendation"),
+                    "reason": details.get("reason"),
+                }
+            else:
+                print(
+                    f"[OpenAI Service] Warning: Unexpected format for suggestion details for '{title}': {details}"
+                )
         return parsed_suggestions
     except json.JSONDecodeError as e:
         print(f"[OpenAI Service] Error decoding JSON response for suggestions: {e}")
         print(f"Raw response was:\n{raw_response_content}")
-        return {}  # Return empty or raise error
+        return {}
     except Exception as e:
         print(f"[OpenAI Service] Unexpected error getting suggestions: {e}")
         return {}
 
 
 def get_improved_markdown_for_section(
-    original_h3_markdown_content: str,  # Full original markdown of the H3 section
+    original_h3_markdown_content: str,
     enhancement_type: Optional[str],
     enhancement_reason: Optional[str],
-    panel_title_context: str,  # Title of the parent H2 Panel
-    overall_panel_context_md: str,  # Scene desc + teaching narrative
+    panel_title_context: str,
+    overall_panel_context_md: str,
 ) -> Optional[str]:
-    """
-    Sends an H3 section's original Markdown and an enhancement suggestion to OpenAI
-    and requests an improved version of the Markdown.
-    Args:
-        original_h3_markdown_content: The full Markdown string of the H3 section.
-        enhancement_type: The type of enhancement suggested (e.g., "Add Diagram").
-        enhancement_reason: The reason for the enhancement.
-        panel_title_context: The title of the H2 panel this H3 belongs to.
-        overall_panel_context_md: Broader context from the panel.
-    Returns:
-        The improved Markdown string for the H3 section, or None if an error occurs.
-    """
     if not original_h3_markdown_content:
         return None
 
-    # Extract H3 title from the original markdown for the prompt
     h3_title_in_md = (
-        original_h3_markdown_content.splitlines()[0]
-        if original_h3_markdown_content.startswith("### ")
+        original_h3_markdown_content.splitlines()[0].strip()
+        if original_h3_markdown_content.strip().startswith("### ")
         else "This Section"
     )
 
