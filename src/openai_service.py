@@ -210,8 +210,8 @@ else:
         MOCK_CLIENT = True
 
 
-MODEL_FOR_SUGGESTIONS = "gpt-4o"  # Or "gpt-3.5-turbo", etc.
-MODEL_FOR_ENHANCEMENT = "gpt-4o"  # Or "gpt-3.5-turbo", etc.
+MODEL_FOR_SUGGESTIONS = "gpt-4o-2024-11-20"  # Or "gpt-3.5-turbo", etc.
+MODEL_FOR_ENHANCEMENT = "gpt-4o-2024-11-20"  # Or "gpt-3.5-turbo", etc.
 
 
 def get_enhancement_suggestions_for_panel_h3s(
