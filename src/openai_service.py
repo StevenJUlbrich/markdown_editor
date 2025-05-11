@@ -25,26 +25,30 @@ class MockOpenAIClient:
                 user_content = messages[-1]["content"]
                 # Uncomment for deep prompt debugging:
                 # print(f"\n--- MockOpenAIClient.create RECEIVED PROMPT (Model '{model}') ---")
-                # print(user_content)
+                # print(f"First 600 chars:\n{user_content[:600]}")
                 # print("---------------------------------------------------------------")
                 print(f"\n--- MockOpenAIClient.create called (Model: {model}) ---")
 
-                # Precise keywords for "get_section_improvement_suggestions"
-                is_suggestion_prompt = (
-                    "Evaluate the following H3 sub-sections from this panel."
-                    in user_content
-                    and "provide your assessment in the following JSON format:"
-                    in user_content
-                    and "H3 Sub-sections to Evaluate:\n---" in user_content
+                # More specific and ordered keywords for "get_section_improvement_suggestions"
+                suggestion_keywords = [
+                    "You are a senior SRE and technical learning designer.",
+                    "Evaluate the following H3 sub-sections from this panel.",
+                    "H3 Sub-sections to Evaluate:\n---",
+                    "provide your assessment in the following JSON format:",
+                ]
+                is_suggestion_prompt = all(
+                    kw in user_content for kw in suggestion_keywords
                 )
-                # Precise keywords for "enhance_section"
-                is_enhancement_prompt = (
-                    "improve a specific H3 sub-section from a larger document panel"
-                    in user_content
-                    and "Return *only* the complete, improved Markdown for this H3 sub-section"
-                    in user_content
-                    and "Here is the original H3 sub-section content:\n---"
-                    in user_content
+
+                # More specific and ordered keywords for "enhance_section"
+                enhancement_keywords = [
+                    "You are a senior SRE and technical learning designer.",
+                    "improve a specific H3 sub-section from a larger document panel",
+                    "Here is the original H3 sub-section content:\n---",
+                    "Return *only* the complete, improved Markdown for this H3 sub-section",
+                ]
+                is_enhancement_prompt = all(
+                    kw in user_content for kw in enhancement_keywords
                 )
 
                 if is_suggestion_prompt:
@@ -53,7 +57,6 @@ class MockOpenAIClient:
                     )
 
                     mock_suggestions: Dict[str, Dict[str, Any]] = {}
-                    # Extract the block of H3s to evaluate
                     h3_eval_block_match = re.search(
                         r"H3 Sub-sections to Evaluate:\s*---\s*(.*?)\s*---",
                         user_content,
@@ -63,12 +66,14 @@ class MockOpenAIClient:
 
                     if h3_eval_block_match:
                         h3_eval_text = h3_eval_block_match.group(1)
-                        # Find lines starting with "## " (which is how H3s are formatted in the prompt for evaluation)
-                        # followed by any characters until the end of the line.
                         found_titles = re.findall(
                             r"^\s*##\s*(.+?)\s*$", h3_eval_text, re.MULTILINE
                         )
-                        h3_titles_in_prompt = [title.strip() for title in found_titles]
+                        h3_titles_in_prompt = [
+                            title.strip()
+                            for title in found_titles
+                            if title.strip() != "H3 Sub-sections to Evaluate:"
+                        ]
                         print(
                             f"MockOpenAIClient: Parsed H3 titles for suggestions: {h3_titles_in_prompt}"
                         )
@@ -79,28 +84,31 @@ class MockOpenAIClient:
 
                     if not h3_titles_in_prompt:
                         print(
-                            "MockOpenAIClient: No H3 titles parsed from prompt for suggestions, returning empty JSON to avoid error."
+                            "MockOpenAIClient: No H3 titles parsed from prompt for suggestions, returning empty JSON."
                         )
                         response_content = json.dumps({}, indent=2)
                     else:
                         for i, title in enumerate(h3_titles_in_prompt):
                             title_key = str(title).strip()
-                            # Make "Initial Content" less likely to be "Yes" for enhancement
                             if (
                                 title_key == "Initial Content"
-                                and i < len(h3_titles_in_prompt) - 1
-                            ):  # if not the only section
+                                and len(h3_titles_in_prompt) > 1
+                            ):
                                 enhance_decision = "No"
                                 recommendation = None
-                                reason = f"The '{title_key}' section is usually introductory and may not need specific enhancement unless substantial."
-                            elif i % 2 == 0:
+                                reason = f"The '{title_key}' section is usually introductory; specific enhancements are better targeted at named H3s unless it's substantial."
+                            elif i % 3 == 0:  # Vary the suggestions a bit more
                                 enhance_decision = "Yes"
-                                recommendation = "Add Clarifying Example"
-                                reason = f"A clarifying example would make '{title_key}' more concrete."
+                                recommendation = "Add Detailed Checklist"
+                                reason = f"A checklist would provide actionable steps for '{title_key}'."
+                            elif i % 3 == 1:
+                                enhance_decision = "Yes"
+                                recommendation = "Incorporate a Table"
+                                reason = f"A table could summarize key information in '{title_key}' effectively."
                             else:
                                 enhance_decision = "No"
                                 recommendation = None
-                                reason = f"The section '{title_key}' is adequate as is."
+                                reason = f"The section '{title_key}' is clear and does not require immediate changes."
 
                             mock_suggestions[title_key] = {
                                 "enhance": enhance_decision,
@@ -133,17 +141,17 @@ class MockOpenAIClient:
                     )
 
                     response_content = (
-                        f"### {original_h3_title} (Enhanced via Mock Service - Type: {enhancement_type})\n\n"
+                        f"### {original_h3_title} (Enhanced by MockAPI - Type: {enhancement_type})\n\n"
                         f"This is the **mock enhanced Markdown content** for the section originally titled '{original_h3_title}'.\n"
                         f"The suggestion was to improve it with: '{enhancement_type}'.\n\n"
                         f"Key changes include:\n"
-                        f"- More detailed explanations.\n"
-                        f"- Added a hypothetical list item for better structure.\n\n"
-                        f"This demonstrates a successful mock enhancement."
+                        f"- More detailed explanations and examples have been woven in.\n"
+                        f"- A new summary bullet point list might be added for quick takeaways.\n\n"
+                        f"This mock ensures the content is different and reflects a tangible enhancement based on the suggestion."
                     )
                 else:
                     print(
-                        "MockOpenAIClient: Prompt not matched. Simulating a generic non-JSON response (this will cause JSONDecodeError downstream if JSON is expected)."
+                        "MockOpenAIClient: Prompt not matched. Simulating a generic non-JSON response."
                     )
                     response_content = "This is a generic mock response from OpenAI because the prompt was not recognized as a specific suggestion or enhancement request."
 
@@ -201,27 +209,34 @@ def get_enhancement_suggestions_for_panel_h3s(
 
     h3_sections_text_for_prompt = []
     for h3_title, h3_md in h3_sections_content.items():
-        content_without_heading = h3_md
+        content_without_heading = (
+            h3_md  # Default to full markdown if heading not found/stripped
+        )
         temp_content = h3_md.strip()
 
-        # original_full_markdown for H3 should include "### H3 Title"
-        # The mock client's title parser expects "## H3 Title" within the evaluation block.
-        # The actual content sent for evaluation should be *after* the heading.
-        if temp_content.startswith(f"### {h3_title}"):
+        # Check if h3_md starts with "### H3_Title" and strip it for the prompt section
+        # The prompt expects "## H3_Title" for the mock client's parsing.
+        expected_heading = f"### {h3_title}"
+        if temp_content.startswith(expected_heading):
             lines = temp_content.splitlines()
-            if len(lines) > 1:
+            if len(lines) > 1:  # Content exists beyond the heading
                 content_without_heading = "\n".join(lines[1:]).strip()
-            else:
+            else:  # Only the heading line was present
                 content_without_heading = ""
         elif temp_content.startswith(
             "### "
-        ):  # Title in content doesn't match h3_title from Pydantic
-            lines = temp_content.splitlines()
-            if len(lines) > 1:
-                content_without_heading = "\n".join(lines[1:]).strip()
-            else:
-                content_without_heading = ""
-        # If h3_md doesn't start with "### H3_Title", content_without_heading remains h3_md
+        ):  # Starts with H3 but title mismatch or other H3
+            # This means original_full_markdown might not be perfectly aligned with h3_title
+            # Or h3_title is "Initial Content" and h3_md is actual content from another H3
+            # For "Initial Content", h3_md should NOT start with "### Initial Content"
+            if h3_title == "Initial Content":
+                content_without_heading = temp_content  # Use as is
+            else:  # It's a named H3, but title in content doesn't match. Strip generic H3.
+                lines = temp_content.splitlines()
+                if len(lines) > 1:
+                    content_without_heading = "\n".join(lines[1:]).strip()
+                else:
+                    content_without_heading = ""
 
         h3_sections_text_for_prompt.append(
             f"## {h3_title}\n{content_without_heading if content_without_heading else 'This section appears to have no primary content following its heading.'}"
@@ -301,13 +316,18 @@ def get_improved_markdown_for_section(
     panel_title_context: str,
     overall_panel_context_md: str,
 ) -> Optional[str]:
-    if not original_h3_markdown_content:
-        return None
+    if (
+        not original_h3_markdown_content
+    ):  # If original content is empty, nothing to improve
+        print(
+            f"[OpenAI Service] Skipping enhancement for empty original content (H3: {original_h3_markdown_content[:30]}...)."
+        )
+        return None  # Or return original_h3_markdown_content if API should generate from scratch
 
     h3_title_in_md = "This Section"
     lines = original_h3_markdown_content.strip().splitlines()
     if lines and lines[0].strip().startswith("### "):
-        h3_title_in_md = lines[0].strip()  # This will be "### Actual Title"
+        h3_title_in_md = lines[0].strip()
 
     prompt = f"""You are a senior SRE and technical learning designer.
 You are tasked with improving a specific H3 sub-section from a larger document panel titled "{panel_title_context}".
