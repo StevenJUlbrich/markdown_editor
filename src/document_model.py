@@ -776,6 +776,7 @@ class MarkdownDocument:
             "SRE Best Practice: Evidence-Based Investigation",  # Ensure this matches exact H3 titles
             "Banking Impact",
             "Implementation Guidance",
+            # Add other known H3 titles that are standard in your panels
         ]
 
         extracted_sections: Dict[str, str] = {
@@ -785,6 +786,8 @@ class MarkdownDocument:
         for h3_section in panel.h3_sections:
             normalized_h3_title = h3_section.heading_text.strip()
             if normalized_h3_title in extracted_sections:
+                # We store the full original markdown of the H3 section,
+                # which includes its heading, initial content, and all H4s.
                 extracted_sections[normalized_h3_title] = (
                     h3_section.original_full_markdown
                 )
@@ -818,11 +821,12 @@ class MarkdownDocument:
             return False
 
         target_h3_section.api_improved_markdown = new_markdown_content
-        # Optionally, also update suggestion fields if this is part of a full enhancement flow
         target_h3_section.api_suggested_enhancement_needed = (
             True  # Implied if we are updating it
         )
-        # target_h3_section.api_suggested_enhancement_type = "Custom Update via Named Section" # Or from API
+        # Note: If new_markdown_content becomes the new "original", then original_full_markdown
+        # and its constituent parts (initial_content_markdown, h4_sections) would need re-parsing from new_markdown_content.
+        # For now, this method focuses on storing the API's version.
         print(
             f"INFO: API improved markdown set for H3 '{section_h3_title}' in Panel ID {panel_id}."
         )
