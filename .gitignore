@@ -2,4 +2,5 @@ test_markdown_output/test_chapter_01_enhanced.md
 test_markdown_source/test_chapter_01.md
 src/__pycache__/openai_service.cpython-312.pyc
 src/__pycache__/openai_service.cpython-312.pyc
+src/__pycache__/
 src/test_markdown_source_batch/test_chapter_01_batch.md
