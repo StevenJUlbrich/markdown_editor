@@ -17,10 +17,8 @@ def display_numbered_list(
         print("  No items to display.")
         return
 
-    # Determine the actual key used for numbering in this specific list items
-    # Default to 'display_number', then 'number', then 1-based index if neither is present
     effective_number_key = None
-    if items:  # Check if list is not empty before accessing items[0]
+    if items:
         if items[0].get("display_number") is not None:
             effective_number_key = "display_number"
         elif items[0].get(number_key) is not None:
@@ -29,7 +27,7 @@ def display_numbered_list(
     for item_idx, item in enumerate(items):
         if effective_number_key:
             num_to_display = item.get(effective_number_key)
-            if num_to_display is None:  # Fallback if key exists but value is None
+            if num_to_display is None:
                 num_to_display = item_idx + 1
         else:
             num_to_display = item_idx + 1
@@ -47,7 +45,7 @@ def display_numbered_list(
             id_info.append(f"H4_ID:{item['h4_id']}")
         id_display = f" [{', '.join(id_info)}]" if id_info else ""
 
-        raw_id = item.get("id")  # From list_all_h2_sections
+        raw_id = item.get("id")
         if (
             raw_id is not None
             and not id_info
@@ -74,9 +72,9 @@ def get_int_choice(
         try:
             choice_str = input(prompt_text).strip()
             if not choice_str and allow_cancel:
-                print("  Action cancelled.")  # Feedback for cancellation
+                print("  Action cancelled.")
                 return None
-            if not choice_str and not allow_cancel:  # If cancellation is not allowed
+            if not choice_str and not allow_cancel:
                 print("  Input cannot be empty. Please enter a number.")
                 continue
 
@@ -85,7 +83,6 @@ def get_int_choice(
             range_error_msg = ""
             if max_val is not None and not (min_val <= choice_int <= max_val):
                 range_error_msg = f"  Invalid input. Please enter a number between {min_val} and {max_val}."
-            # This check is important if max_val is None (no upper bound)
             elif choice_int < min_val:
                 range_error_msg = f"  Invalid input. Please enter a number greater than or equal to {min_val}."
 
@@ -116,17 +113,17 @@ def main_cli():
         "8": "Process API Enhancement for Specific H3 (Select Panel & H3 by #)",
         "9": "View Diff for API-Improved H3 Section",
         "10": "Export Document Structure to JSON",
-        "11": "Save Document",
+        "11": "Enhance Named Sections in Selected Panel (Targeted API Call)",  # New Option
+        "12": "Save Document",  # Renumbered from 11
         "0": "Exit",
     }
     # Determine the highest valid numeric choice for the main menu
-    # Assuming options are contiguous from 0 or 1 up to max_main_menu_choice
     numeric_choices = [int(k) for k in main_menu_options.keys() if k.isdigit()]
     min_main_menu_choice = min(numeric_choices) if numeric_choices else 0
     max_main_menu_choice = max(numeric_choices) if numeric_choices else 0
 
     while True:
-        print(f"\n======= Markdown Processor CLI (Feedback v4) =======")
+        print(f"\n======= Markdown Processor CLI (Targeted Enhance) =======")
         if (
             document_is_loaded
             and controller.doc_model
@@ -208,8 +205,7 @@ def main_cli():
             )
             if panel_doc_num is not None:
                 if not controller.select_panel_by_number_for_cli(panel_doc_num):
-                    pass  # Controller prints failure
-            # else: Panel selection cancelled message is in get_int_choice
+                    pass
 
         elif choice == "5":
             if not document_is_loaded:
@@ -244,8 +240,6 @@ def main_cli():
                         else "  No content found or error retrieving content for this H3."
                     )
                     print("-------------------------------------------------")
-                # else: H3 content view cancelled message is in get_int_choice
-            # display_numbered_list handles "No H3 sections..."
 
         elif choice == "6":
             if not document_is_loaded:
@@ -351,7 +345,7 @@ def main_cli():
                     target_info = controller._get_target_info_from_display_number(
                         section_display_num
                     )
-                    if target_info:
+                    if target_info and controller.doc_model:
                         print(
                             f"\n--- Current content of '{target_info.get('title')}' (Type: {target_info.get('type')}) ---"
                         )
@@ -374,7 +368,7 @@ def main_cli():
                         print("--------------------------------------------------")
 
                     while True:
-                        action_choice_prompt = "  Action: 'replace', 'add start', 'add end', or 'cancel' to abort this operation? (default: replace): "
+                        action_choice_prompt = "  Action: 'replace' current content, 'add start', 'add end', or 'cancel' to abort this operation? (default: replace): "
                         action_choice = (
                             input(action_choice_prompt).strip().lower() or "replace"
                         )
@@ -398,21 +392,17 @@ def main_cli():
                             success = controller.update_target_section_content(
                                 section_display_num, new_md
                             )
-                            if success:
-                                print("  Content replaced successfully.")
-                            else:
-                                print("  Failed to replace content.")
                         elif action_choice in ["add start", "add end"]:
                             pos = "start" if action_choice == "add start" else "end"
                             success = controller.add_to_target_section_content(
                                 section_display_num, new_md, pos
                             )
-                            if success:
-                                print(f"  Content added to {pos} successfully.")
-                            else:
-                                print(f"  Failed to add content to {pos}.")
+
+                        if success:
+                            print(f"  Content action '{action_choice}' successful.")
+                        else:
+                            print(f"  Content action '{action_choice}' failed.")
                         break
-                # else: Modification/addition cancelled by get_int_choice
 
         elif choice == "8":
             if not document_is_loaded:
@@ -434,7 +424,7 @@ def main_cli():
                 "Enter Panel Document Number for the H3 (or Enter to cancel): "
             )
             if panel_doc_num is None:
-                continue  # Cancelled message in get_int_choice
+                continue
 
             original_selected_panel_id = controller.current_selected_panel_id
             if not controller.select_panel_by_number_for_cli(panel_doc_num):
@@ -516,13 +506,12 @@ def main_cli():
                     ):
                         print("  API enhancement processed successfully (simulated).")
                         print(
-                            "  Note: The document model now holds this 'api_improved_markdown'. Save (Option 11) to see changes."
+                            "  Note: The document model now holds this 'api_improved_markdown'. Save (Option 12) to see changes."
                         )
                     else:
                         print("  API enhancement processing failed (simulated).")
                 else:
                     print(f"  Invalid H3 selection from list.")
-            # else: H3 enhancement cancelled message in get_int_choice
 
         elif choice == "9":
             if not document_is_loaded:
@@ -591,7 +580,6 @@ def main_cli():
                         print("--------------------------------------------------")
                 else:
                     print("  Invalid H3 selection from list.")
-            # else: Diff view cancelled message in get_int_choice
 
         elif choice == "10":
             if not document_is_loaded:
@@ -617,7 +605,55 @@ def main_cli():
                 print("  Could not generate JSON output (Controller returned None).")
             print("------------------------------------------")
 
-        elif choice == "11":
+        elif choice == "11":  # New Option: Targeted Panel Enhancement
+            if not document_is_loaded:
+                print("  Please load a document first (Option 1).")
+                continue
+            if controller.current_selected_panel_id is None:
+                print(
+                    "  No panel currently selected. Please select a panel first (Option 4) to target for enhancement."
+                )
+                continue
+
+            print(
+                f"\n--- Targeted API Enhancement for Selected Panel [ID:{controller.current_selected_panel_id}] ---"
+            )
+            print(
+                "This will extract predefined named sections (Scene Description, Teaching Narrative, etc.)"
+            )
+            print(
+                "from the currently selected panel, send them for API suggestions, and then enhance them if suggested."
+            )
+
+            panel_to_enhance_id = (
+                controller.current_selected_panel_id
+            )  # Use the already selected panel ID
+            panel_to_enhance_title = controller.get_current_selected_panel_title()
+
+            confirm = (
+                input(
+                    f"Proceed with enhancing Panel ID {panel_to_enhance_id} ('{panel_to_enhance_title}')? (yes/no): "
+                )
+                .strip()
+                .lower()
+            )
+            if confirm == "yes":
+                if controller.enhance_structured_panel_sections(panel_to_enhance_id):
+                    # Controller method now prints detailed INFO/ERROR messages
+                    print(
+                        f"  Targeted enhancement process for Panel ID {panel_to_enhance_id} completed."
+                    )
+                    print(
+                        "  Remember to save the document (Option 12) to persist changes."
+                    )
+                else:  # Should ideally not happen if panel_id is valid and doc_model exists
+                    print(
+                        f"  Targeted enhancement process for Panel ID {panel_to_enhance_id} encountered an error or was aborted by controller."
+                    )
+            else:
+                print("  Targeted enhancement cancelled.")
+
+        elif choice == "12":  # Save Document (was 11)
             if not document_is_loaded:
                 print("  Please load a document first (Option 1).")
                 continue
