@@ -5,7 +5,9 @@ from typing import Any, Dict, List, Optional
 
 # Assuming document_model.py and openai_service.py are in the same directory or PYTHONPATH
 import openai_service  # Our service for OpenAI calls
-from document_model import MarkdownDocument, PanelPydantic  # Pydantic-based model
+
+# Ensure PanelPydantic and H3Pydantic are imported if type hints are needed for internal vars
+from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
 
 
 class BatchProcessor:
@@ -49,9 +51,6 @@ class BatchProcessor:
             print(
                 f"Validation Warning: No Panel sections found in {doc_model.filepath}."
             )
-            # Decide if this is a critical error or just a warning
-            # return False
-
         print(f"Validation basic check passed for {doc_model.filepath}.")
         return True
 
@@ -75,11 +74,18 @@ class BatchProcessor:
         for element in doc.chapter_model.document_elements:
             if isinstance(element, PanelPydantic):
                 panel: PanelPydantic = element
-                print(f"  Processing Panel: {panel.panel_title_text}")
+                # Ensure panel_number_in_doc is available for calls
+                if panel.panel_number_in_doc is None:
+                    print(
+                        f"Critical Error: Panel '{panel.panel_title_text}' is missing its document number. Skipping panel processing."
+                    )
+                    continue
 
-                # Simplified panel context for now, can be expanded
+                print(
+                    f"  Processing Panel: ID {panel.panel_number_in_doc} ('{panel.panel_title_text}')"
+                )
+
                 panel_context_markdown = f"## {panel.panel_title_text}\n"
-                # Example: Add Scene Description and Teaching Narrative if they exist as first H3s
                 if panel.h3_sections:
                     if "scene description" in panel.h3_sections[0].heading_text.lower():
                         panel_context_markdown += (
@@ -95,16 +101,23 @@ class BatchProcessor:
                         )
 
                 h3s_to_evaluate_content: Dict[str, str] = {}
-                valid_h3s_for_api = []
+                valid_h3s_for_api: List[H3Pydantic] = []  # Store H3Pydantic objects
 
                 for h3_section in panel.h3_sections:
-                    # Filter out empty "Initial Content" sections if desired before API call
+                    if (
+                        h3_section.h3_number_in_panel is None
+                    ):  # Should be populated by model
+                        print(
+                            f"Critical Error: H3 section '{h3_section.heading_text}' in Panel ID {panel.panel_number_in_doc} is missing its number. Skipping H3."
+                        )
+                        continue
+
                     if h3_section.heading_text == "Initial Content" and (
                         not h3_section.initial_content_markdown
                         or not h3_section.initial_content_markdown.strip()
                     ):
                         print(
-                            f"    Skipping empty 'Initial Content' in Panel '{panel.panel_title_text}' for API evaluation."
+                            f"    Skipping empty 'Initial Content' in Panel ID {panel.panel_number_in_doc} for API evaluation."
                         )
                         continue
                     h3s_to_evaluate_content[h3_section.heading_text] = (
@@ -114,7 +127,7 @@ class BatchProcessor:
 
                 if not h3s_to_evaluate_content:
                     print(
-                        f"    No non-empty H3 sections found in Panel '{panel.panel_title_text}' to evaluate."
+                        f"    No non-empty H3 sections found in Panel ID {panel.panel_number_in_doc} to evaluate."
                     )
                     continue
 
@@ -123,16 +136,17 @@ class BatchProcessor:
                     print(
                         f"    DRY RUN: Would call OpenAI for suggestions for {len(h3s_to_evaluate_content)} H3 section(s)..."
                     )
-                    # Simulate some suggestions for dry run testing flow
-                    for i, h3_title_key in enumerate(h3s_to_evaluate_content.keys()):
-                        if i % 2 == 0:  # Make some sections need enhancement in dry run
-                            suggestions[h3_title_key] = {
-                                "enhance": True,
-                                "recommendation": "Add DryRun Example",
-                                "reason": "Dry run testing",
-                            }
+                    for i, h3_s_obj in enumerate(valid_h3s_for_api):
+                        if i % 2 == 0:
+                            suggestions[h3_s_obj.heading_text] = (
+                                {  # Use heading_text as key for suggestions dict
+                                    "enhance": True,
+                                    "recommendation": "Add DryRun Example",
+                                    "reason": "Dry run testing",
+                                }
+                            )
                         else:
-                            suggestions[h3_title_key] = {
+                            suggestions[h3_s_obj.heading_text] = {
                                 "enhance": False,
                                 "recommendation": None,
                                 "reason": "Dry run, no change",
@@ -141,36 +155,36 @@ class BatchProcessor:
                     print(
                         f"    Getting OpenAI suggestions for {len(h3s_to_evaluate_content)} H3 section(s)..."
                     )
-                    suggestions = (
-                        openai_service.get_enhancement_suggestions_for_panel_h3s(
-                            panel_title=panel.panel_title_text,
-                            panel_context_markdown=panel_context_markdown.strip(),
-                            h3_sections_content=h3s_to_evaluate_content,
-                        )
+                    suggestions = openai_service.get_enhancement_suggestions_for_panel_h3s(
+                        panel_title=panel.panel_title_text,  # API service might still use title for context
+                        panel_context_markdown=panel_context_markdown.strip(),
+                        h3_sections_content=h3s_to_evaluate_content,
                     )
 
                 if not suggestions:
                     print(
-                        f"    No suggestions received (or simulated) for H3s in Panel '{panel.panel_title_text}'."
+                        f"    No suggestions received (or simulated) for H3s in Panel ID {panel.panel_number_in_doc}."
                     )
-                    # continue # Continue to next panel if no suggestions
 
-                for (
-                    h3_section
-                ) in valid_h3s_for_api:  # Iterate only over H3s sent for evaluation
-                    suggestion_for_h3 = suggestions.get(h3_section.heading_text)
+                for h3_section in valid_h3s_for_api:
+                    suggestion_for_h3 = suggestions.get(
+                        h3_section.heading_text
+                    )  # Suggestions dict keyed by heading_text
                     if suggestion_for_h3:
                         doc.update_h3_section_with_api_suggestions(
-                            panel_title=panel.panel_title_text,
-                            h3_title=h3_section.heading_text,
+                            panel_id=panel.panel_number_in_doc,  # Use numeric ID
+                            h3_id_in_panel=h3_section.h3_number_in_panel,  # Use numeric ID
                             should_enhance=suggestion_for_h3.get("enhance"),
                             enhancement_type=suggestion_for_h3.get("recommendation"),
                             enhancement_reason=suggestion_for_h3.get("reason"),
                         )
-                        if suggestion_for_h3.get("enhance"):
+                        # The model object (h3_section) is updated directly by the above call.
+                        if (
+                            h3_section.api_suggested_enhancement_needed
+                        ):  # Check the flag on the model object
                             any_h3_marked_for_enhancement = True
                             print(
-                                f"      H3 '{h3_section.heading_text}' marked for enhancement: {suggestion_for_h3.get('recommendation')}"
+                                f"      H3 '{h3_section.heading_text}' (ID: {h3_section.h3_number_in_panel}) marked for enhancement: {h3_section.api_suggested_enhancement_type}"
                             )
 
                 for h3_section in valid_h3s_for_api:
@@ -178,32 +192,30 @@ class BatchProcessor:
                         improved_md: Optional[str] = None
                         if self.dry_run:
                             print(
-                                f"    DRY RUN: Would call OpenAI to enhance H3: {h3_section.heading_text} (Suggestion: {h3_section.api_suggested_enhancement_type})"
+                                f"    DRY RUN: Would call OpenAI to enhance H3 ID {h3_section.h3_number_in_panel} ('{h3_section.heading_text}') (Suggestion: {h3_section.api_suggested_enhancement_type})"
                             )
-                            improved_md = f"### {h3_section.heading_text}\n\nThis is a **DRY RUN enhanced version** for '{h3_section.heading_text}' based on '{h3_section.api_suggested_enhancement_type}'.\nOriginal content snippet: {h3_section.original_full_markdown[:100]}..."
+                            improved_md = f"### {h3_section.heading_text}\n\nThis is a **DRY RUN enhanced version** for H3 ID {h3_section.h3_number_in_panel} ('{h3_section.heading_text}') based on '{h3_section.api_suggested_enhancement_type}'.\nOriginal content snippet: {h3_section.original_full_markdown[:100]}..."
                         else:
                             print(
-                                f"    Getting improved content for H3: {h3_section.heading_text} (Suggestion: {h3_section.api_suggested_enhancement_type})"
+                                f"    Getting improved content for H3 ID {h3_section.h3_number_in_panel} ('{h3_section.heading_text}') (Suggestion: {h3_section.api_suggested_enhancement_type})"
                             )
                             improved_md = openai_service.get_improved_markdown_for_section(
                                 original_h3_markdown_content=h3_section.original_full_markdown,
                                 enhancement_type=h3_section.api_suggested_enhancement_type,
                                 enhancement_reason=h3_section.api_suggested_enhancement_reason,
-                                panel_title_context=panel.panel_title_text,
+                                panel_title_context=panel.panel_title_text,  # Context for API
                                 overall_panel_context_md=panel_context_markdown.strip(),
                             )
 
-                        if (
-                            improved_md is not None
-                        ):  # Check for None, not just truthiness, as empty string might be valid
+                        if improved_md is not None:
                             doc.update_h3_section_with_improved_markdown(
-                                panel_title=panel.panel_title_text,
-                                h3_title=h3_section.heading_text,
+                                panel_id=panel.panel_number_in_doc,  # Use numeric ID
+                                h3_id_in_panel=h3_section.h3_number_in_panel,  # Use numeric ID
                                 improved_markdown=improved_md,
                             )
                         else:
                             print(
-                                f"      Failed to get (or simulate) improved content for H3: {h3_section.heading_text}"
+                                f"      Failed to get (or simulate) improved content for H3 ID {h3_section.h3_number_in_panel} ('{h3_section.heading_text}')"
                             )
 
         if any_h3_marked_for_enhancement:
@@ -211,10 +223,7 @@ class BatchProcessor:
             output_dir.mkdir(parents=True, exist_ok=True)
             if self.dry_run:
                 print(f"  DRY RUN: Would save enhanced document to: {output_filename}")
-                # Optionally print a snippet of what would be saved in dry run:
-                # dry_run_content = doc.reconstruct_and_render_document()
-                # print(f"  DRY RUN: Content snippet (first 200 chars):\n{dry_run_content[:200]}...")
-                return True  # Simulate success for dry run
+                return True
             else:
                 if doc.save_document(str(output_filename)):
                     print(f"  Enhanced document saved to: {output_filename}")
@@ -226,9 +235,10 @@ class BatchProcessor:
             print(
                 f"  No enhancements suggested or applied for {filepath.name}. Original preserved (not re-saved)."
             )
-            return True  # Still considered a successful process in terms of workflow
+            return True
 
     def process_directory(self, source_dir_path: str, output_dir_path: str) -> None:
+        # ... (this method remains the same) ...
         source_dir = Path(source_dir_path)
         output_dir = Path(output_dir_path)
 
@@ -244,15 +254,11 @@ class BatchProcessor:
                 f"--- Actions will be simulated, no files will be written, no API calls made ---"
             )
 
-        output_dir.mkdir(
-            parents=True, exist_ok=True
-        )  # Still create output_dir in dry_run to check writability
+        output_dir.mkdir(parents=True, exist_ok=True)
         print(f"Processing Markdown files from: {source_dir}")
         print(f"Output will be saved to (or simulated for): {output_dir}")
 
-        markdown_files = list(
-            source_dir.glob("*.md")
-        )  # Consider specific patterns like "chapter_*.md"
+        markdown_files = list(source_dir.glob("*.md"))
 
         if not markdown_files:
             print(f"No Markdown files found in '{source_dir}'.")
@@ -273,58 +279,27 @@ class BatchProcessor:
         print(f"Failed to process: {failed_count} file(s).")
 
 
-# --- Example Usage (for testing this module directly) ---
 if __name__ == "__main__":
     print("Starting Batch Processor Test...")
-
-    # --- !!! SET DRY_RUN MODE HERE for testing !!! ---
     DRY_RUN_ENABLED = True
-    # Set to False to perform actual operations (API calls, file saves)
-    # --- !!! ------------------------------------ !!! ---
-
-    # Create dummy directories and a file for testing
     current_script_dir = Path(__file__).parent
-    test_source_dir = (
-        current_script_dir / "test_markdown_source_batch"
-    )  # Changed name to avoid conflict
+    test_source_dir = current_script_dir / "test_markdown_source_batch"
     test_output_dir = current_script_dir / "test_markdown_output_batch"
     test_source_dir.mkdir(exist_ok=True)
     test_output_dir.mkdir(exist_ok=True)
 
     dummy_md_content_batch = """# Chapter 1: Test Chapter Batch
-
-## Chapter Overview
-This is a test overview for batch processing.
-
----
-
 ## Panel 1: Test Panel One Batch
 ### Scene Description
-A test scene for batch.
+Content for scene description.
 ### Teaching Narrative
-Test teaching narrative for panel one batch.
-### Common Example of the Problem
-A test common problem for batch.
-### SRE Best Practice: Evidence-Based Investigation
-Test SRE best practice for batch.
-
----
-
-## Panel 2: Test Panel Two Batch
-### Scene Description
-Another test scene for batch.
-### Teaching Narrative
-Test teaching narrative for panel two batch.
-### SRE Best Practice: Evidence-Based Investigation
-Test SRE best practice for batch.
+Content for teaching narrative.
     """
     dummy_file_path_batch = test_source_dir / "test_chapter_01_batch.md"
     with open(dummy_file_path_batch, "w", encoding="utf-8") as f:
         f.write(dummy_md_content_batch)
-
     print(f"Created dummy file: {dummy_file_path_batch}")
 
-    processor = BatchProcessor(dry_run=DRY_RUN_ENABLED)  # Pass the dry_run flag
+    processor = BatchProcessor(dry_run=DRY_RUN_ENABLED)
     processor.process_directory(str(test_source_dir), str(test_output_dir))
-
     print("\nBatch Processor Test Finished.")
