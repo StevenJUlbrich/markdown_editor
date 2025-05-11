@@ -38,8 +38,20 @@ def render_blocks_to_markdown(
         print(f"Problematic valid_blocks (first 5): {valid_blocks[:5]}")
         return "Error: Could not render blocks."
 
+    # Use the passed renderer if available, otherwise create a new one for this scope
     active_renderer = renderer if renderer else MarkdownRenderer()
     return active_renderer.render(temp_doc).strip()
+
+
+# --- Attempt to instantiate the renderer at the module level ---
+_MODULE_LEVEL_RENDERER_INSTANCE: Optional[MarkdownRenderer] = None
+try:
+    _MODULE_LEVEL_RENDERER_INSTANCE = MarkdownRenderer()
+    print("INFO: Module-level MarkdownRenderer instantiated successfully.")
+except Exception as e:
+    print(f"CRITICAL ERROR: Could not instantiate module-level MarkdownRenderer: {e}")
+    print("Further Mistletoe operations will likely fail.")
+    # _MODULE_LEVEL_RENDERER_INSTANCE remains None
 
 
 # --- Pydantic Models ---
@@ -60,14 +72,9 @@ class H3Pydantic(BaseModel):
     h4_sections: List[H4Pydantic] = Field(default_factory=list)
     original_full_markdown: str = ""
 
-    # For OpenAI enhancement suggestions (from first API call)
-    api_suggested_enhancement_needed: Optional[bool] = None  # From "enhance: Yes/No"
-    api_suggested_enhancement_type: Optional[str] = (
-        None  # From "recommendation: Diagram, Example..."
-    )
-    api_suggested_enhancement_reason: Optional[str] = None  # From "reason: ..."
-
-    # For OpenAI generated improved content (from second API call)
+    api_suggested_enhancement_needed: Optional[bool] = None
+    api_suggested_enhancement_type: Optional[str] = None
+    api_suggested_enhancement_reason: Optional[str] = None
     api_improved_markdown: Optional[str] = None
 
 
@@ -101,7 +108,16 @@ class MarkdownDocument:
         self.raw_content: Optional[str] = None
         self.mistletoe_doc: Optional[Document] = None
         self.chapter_model: Optional[ChapterPydantic] = None
-        self.renderer: MarkdownRenderer = MarkdownRenderer()
+
+        if _MODULE_LEVEL_RENDERER_INSTANCE is None:
+            # This will likely raise the same error if module-level instantiation failed
+            # Or, if module-level failed, we might not want to proceed or have a fallback.
+            print(
+                "WARNING: Module-level renderer was not available. Attempting __init__ instantiation."
+            )
+            self.renderer: MarkdownRenderer = MarkdownRenderer()
+        else:
+            self.renderer: MarkdownRenderer = _MODULE_LEVEL_RENDERER_INSTANCE
 
         if filepath:
             self.load_and_process(filepath)
@@ -134,13 +150,11 @@ class MarkdownDocument:
         return True
 
     def _parse_to_mistletoe_ast(self):
-        # ... (remains the same) ...
         if self.raw_content:
             self.mistletoe_doc = Document(self.raw_content)
             print("Document parsed to Mistletoe AST.")
 
     def _build_pydantic_model(self):
-        # ... (remains the same as in markdown_document_model_pydantic_v2) ...
         if not self.mistletoe_doc or not self.mistletoe_doc.children:
             print("Mistletoe AST is empty, cannot build Pydantic model.")
             return
@@ -161,7 +175,7 @@ class MarkdownDocument:
         all_top_level_blocks = self.mistletoe_doc.children
 
         all_top_level_blocks_to_process = all_top_level_blocks[start_index:]
-        if not chapter_h1_block_node and all_top_level_blocks:  # Process all if no H1
+        if not chapter_h1_block_node and all_top_level_blocks:
             all_top_level_blocks_to_process = all_top_level_blocks
 
         current_block_index = 0
@@ -262,8 +276,6 @@ class MarkdownDocument:
     def _parse_h3_sections_from_panel_blocks(
         self, panel_content_blocks: List[BlockToken]
     ) -> List[H3Pydantic]:
-        # ... (remains the same as in markdown_document_model_pydantic_v2,
-        #      it correctly populates H3Pydantic.original_full_markdown and H4s) ...
         h3_pydantic_list: List[H3Pydantic] = []
         current_h3_content_blocks_for_h4s: List[BlockToken] = []
         active_h3_title = "Initial Content"
@@ -384,7 +396,6 @@ class MarkdownDocument:
     def _parse_h4_sections_from_h3_blocks(
         self, h3_content_blocks: List[BlockToken]
     ) -> tuple[str, List[H4Pydantic]]:
-        # ... (remains the same as in markdown_document_model_pydantic_v2) ...
         h4_pydantic_list: List[H4Pydantic] = []
         current_h4_content_blocks: List[BlockToken] = []
         initial_content_for_h3_blocks: List[BlockToken] = []
@@ -444,7 +455,6 @@ class MarkdownDocument:
 
     # --- Listing Methods ---
     def list_all_h2_sections(self) -> List[Dict[str, Any]]:
-        # ... (remains the same) ...
         if not self.chapter_model:
             return []
         sections = []
@@ -474,7 +484,6 @@ class MarkdownDocument:
         return sections
 
     def list_panels(self) -> List[PanelPydantic]:
-        # ... (remains the same) ...
         if not self.chapter_model:
             return []
         return [
@@ -484,7 +493,6 @@ class MarkdownDocument:
         ]
 
     def get_panel_by_number(self, panel_number: int) -> Optional[PanelPydantic]:
-        # ... (remains the same) ...
         if not self.chapter_model:
             return None
         for element in self.chapter_model.document_elements:
@@ -496,7 +504,6 @@ class MarkdownDocument:
         return None
 
     def list_h3_sections_in_panel(self, panel: PanelPydantic) -> List[Dict[str, Any]]:
-        # ... (remains the same) ...
         if not panel:
             return []
         h3_list = []
@@ -509,7 +516,6 @@ class MarkdownDocument:
     def list_targetable_sections_in_panel(
         self, panel: PanelPydantic
     ) -> List[Dict[str, Any]]:
-        # ... (remains the same) ...
         if not panel:
             return []
         targets = []
@@ -569,7 +575,6 @@ class MarkdownDocument:
 
     # --- Getters for Content ---
     def get_panel_pydantic(self, panel_title_fragment: str) -> Optional[PanelPydantic]:
-        # ... (remains the same) ...
         if not self.chapter_model:
             return None
         for element in self.chapter_model.document_elements:
@@ -583,7 +588,6 @@ class MarkdownDocument:
     def get_h3_pydantic(
         self, panel: PanelPydantic, h3_title_fragment: str
     ) -> Optional[H3Pydantic]:
-        # ... (remains the same) ...
         if not panel:
             return None
         for h3_section in panel.h3_sections:
@@ -594,7 +598,6 @@ class MarkdownDocument:
     def get_h4_pydantic(
         self, h3_section: H3Pydantic, h4_title_fragment: str
     ) -> Optional[H4Pydantic]:
-        # ... (remains the same) ...
         if not h3_section:
             return None
         for h4_section_model in h3_section.h4_sections:
@@ -603,7 +606,6 @@ class MarkdownDocument:
         return None
 
     def get_panel_full_markdown(self, panel_data: PanelPydantic) -> str:
-        # ... (remains the same) ...
         if not panel_data or not isinstance(panel_data, PanelPydantic):
             return "Error: Invalid panel data provided."
         panel_blocks_to_render = []
@@ -623,7 +625,6 @@ class MarkdownDocument:
         return render_blocks_to_markdown(panel_blocks_to_render, self.renderer)
 
     def get_h3_subsection_full_markdown(self, h3_subsection_data: H3Pydantic) -> str:
-        # ... (remains the same) ...
         if not h3_subsection_data or not isinstance(h3_subsection_data, H3Pydantic):
             return "Error: Invalid H3 subsection data provided."
         return h3_subsection_data.original_full_markdown
@@ -631,7 +632,6 @@ class MarkdownDocument:
     def get_h4_subsubsection_full_markdown(
         self, h4_subsubsection_data: H4Pydantic
     ) -> str:
-        # ... (remains the same) ...
         if not h4_subsubsection_data or not isinstance(
             h4_subsubsection_data, H4Pydantic
         ):
@@ -658,7 +658,6 @@ class MarkdownDocument:
         h4_title: Optional[str] = None,
         is_initial_content_target: bool = False,
     ) -> Optional[str]:
-        # ... (remains the same) ...
         panel = self.get_panel_pydantic(panel_title)
         if not panel:
             return f"Error: Panel '{panel_title}' not found."
@@ -734,7 +733,6 @@ class MarkdownDocument:
         h4_title: Optional[str] = None,
         is_h3_initial_content_target: bool = False,
     ) -> bool:
-        # ... (remains the same as in markdown_document_model_pydantic_v2) ...
         panel = self.get_panel_pydantic(panel_title)
         if not panel:
             print(f"Panel '{panel_title}' not found.")
@@ -809,7 +807,6 @@ class MarkdownDocument:
         h4_title: Optional[str] = None,
         is_h3_initial_content_target: bool = False,
     ) -> bool:
-        # ... (remains the same as in markdown_document_model_pydantic_v2) ...
         panel = self.get_panel_pydantic(panel_title)
         if not panel:
             print(f"Panel '{panel_title}' not found.")
@@ -862,7 +859,6 @@ class MarkdownDocument:
         return True
 
     def _regenerate_h3_full_markdown(self, h3_section: H3Pydantic) -> str:
-        # ... (remains the same) ...
         blocks_for_render = []
         if h3_section.mistletoe_h3_block:
             blocks_for_render.append(h3_section.mistletoe_h3_block)
@@ -882,7 +878,6 @@ class MarkdownDocument:
         return render_blocks_to_markdown(blocks_for_render, self.renderer)
 
     def reconstruct_and_render_document(self) -> str:
-        # ... (remains the same, it correctly uses api_improved_markdown or original_full_markdown) ...
         if not self.chapter_model:
             return self.raw_content or ""
         all_final_blocks: List[BlockToken] = []
@@ -924,7 +919,6 @@ class MarkdownDocument:
         return render_blocks_to_markdown(all_final_blocks, self.renderer)
 
     def save_document(self, output_filepath: str) -> bool:
-        # ... (remains the same) ...
         rendered_content = self.reconstruct_and_render_document()
         try:
             with open(output_filepath, "w", encoding="utf-8") as f:
