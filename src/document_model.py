@@ -1,5 +1,5 @@
 # document_model.py
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
 
 from mistletoe import Document
 from mistletoe.block_token import BlockToken, Heading, Paragraph
@@ -19,8 +19,8 @@ def get_heading_text(heading_node: Heading) -> str:
 
 
 def render_blocks_to_markdown(
-    blocks: List[BlockToken], renderer: Optional[MarkdownRenderer] = None
-) -> str:
+    blocks: List[BlockToken], renderer: MarkdownRenderer
+) -> str:  # Made renderer non-optional
     if not blocks:
         return ""
     valid_blocks = [b for b in blocks if b is not None and isinstance(b, BlockToken)]
@@ -33,9 +33,7 @@ def render_blocks_to_markdown(
         print(f"Error assigning children in render_blocks_to_markdown: {e}")
         print(f"Problematic valid_blocks (first 5): {valid_blocks[:5]}")
         return "Error: Could not render blocks."
-    if renderer is None:
-        print("CRITICAL ERROR in render_blocks_to_markdown: Renderer not provided.")
-        raise ValueError("Renderer must be provided to render_blocks_to_markdown")
+    # Renderer is now expected to be passed
     return renderer.render(temp_doc).strip()
 
 
@@ -57,7 +55,7 @@ class H4Pydantic(BaseModel):
     heading_text: str
     mistletoe_h4_block: Optional[Any] = None
     content_markdown: str = ""
-    h4_number_in_h3: int  # New ID field
+    h4_number_in_h3: int
 
 
 class H3Pydantic(BaseModel):
@@ -70,7 +68,7 @@ class H3Pydantic(BaseModel):
     api_suggested_enhancement_type: Optional[str] = None
     api_suggested_enhancement_reason: Optional[str] = None
     api_improved_markdown: Optional[str] = None
-    h3_number_in_panel: int  # New ID field
+    h3_number_in_panel: int
 
 
 class PanelPydantic(BaseModel):
@@ -112,61 +110,59 @@ class MarkdownDocument:
             self.load_and_process(filepath)
 
     def load_and_process(self, filepath: str) -> bool:
-        # (load_and_process, _parse_to_mistletoe_ast remain largely the same as v3)
         self.filepath = filepath
         try:
             with open(self.filepath, "r", encoding="utf-8") as f:
                 self.raw_content = f.read()
-            print(f"Successfully loaded '{self.filepath}'.")
+            print(f"INFO: Successfully loaded '{self.filepath}'.")
         except FileNotFoundError:
-            print(f"Error: File not found at '{self.filepath}'")
+            print(f"ERROR: File not found at '{self.filepath}'")
             self.raw_content = None
             return False
         except Exception as e:
-            print(f"Error reading file: {e}")
+            print(f"ERROR: Error reading file '{self.filepath}': {e}")
             self.raw_content = None
             return False
 
         if self.raw_content:
             self._parse_to_mistletoe_ast()
-            self._build_pydantic_model()
+            self._build_pydantic_model()  # This will now call _validate_internal_ids
             if not self.mistletoe_doc or not self.mistletoe_doc.children:
-                print("Warning: Document was loaded but Mistletoe AST is empty.")
+                print("WARNING: Document was loaded but Mistletoe AST is empty.")
             elif not self.chapter_model or not self.chapter_model.document_elements:
                 print(
-                    "Warning: Document parsed, but Pydantic chapter model is empty or has no elements."
+                    "WARNING: Document parsed, but Pydantic chapter model is empty or has no elements."
                 )
         return True
 
     def _parse_to_mistletoe_ast(self):
         if self.raw_content:
             self.mistletoe_doc = Document(self.raw_content)
-            print("Document parsed to Mistletoe AST.")
+            print("INFO: Document parsed to Mistletoe AST.")
 
     def _build_pydantic_model(self):
-        # (Largely same as v3, but ensure panel_number_in_doc is assigned)
         if not self.mistletoe_doc or not self.mistletoe_doc.children:
-            print("Mistletoe AST is empty, cannot build Pydantic model.")
+            print("ERROR: Mistletoe AST is empty, cannot build Pydantic model.")
             return
 
         doc_elements: List[Union[GenericContentPydantic, PanelPydantic]] = []
         current_generic_blocks: List[BlockToken] = []
-
         chapter_h1_block_node: Optional[Heading] = None
         chapter_title = "Untitled Chapter"
         panel_counter = 0
 
-        first_block = self.mistletoe_doc.children[0]
-        if isinstance(first_block, Heading) and first_block.level == 1:
-            chapter_h1_block_node = first_block
+        if (
+            self.mistletoe_doc.children
+            and isinstance(self.mistletoe_doc.children[0], Heading)
+            and self.mistletoe_doc.children[0].level == 1
+        ):
+            chapter_h1_block_node = self.mistletoe_doc.children[0]
             chapter_title = get_heading_text(chapter_h1_block_node)
+            start_index = 1
+        else:
+            start_index = 0
 
-        start_index = 1 if chapter_h1_block_node else 0
-        all_top_level_blocks = self.mistletoe_doc.children
-
-        all_top_level_blocks_to_process = all_top_level_blocks[start_index:]
-        if not chapter_h1_block_node and all_top_level_blocks:
-            all_top_level_blocks_to_process = all_top_level_blocks
+        all_top_level_blocks_to_process = self.mistletoe_doc.children[start_index:]
 
         current_block_index = 0
         while current_block_index < len(all_top_level_blocks_to_process):
@@ -201,7 +197,7 @@ class MarkdownDocument:
                     )
                     current_generic_blocks = []
 
-                panel_counter += 1  # Assign panel number
+                panel_counter += 1
                 panel_content_blocks_for_h3s: List[BlockToken] = []
                 current_block_index += 1
 
@@ -229,7 +225,7 @@ class MarkdownDocument:
                         panel_title_text=panel_title_text,
                         mistletoe_h2_block=panel_h2_block_node,
                         h3_sections=panel_h3_sections,
-                        panel_number_in_doc=panel_counter,  # Store the panel number
+                        panel_number_in_doc=panel_counter,
                     )
                 )
             else:
@@ -260,8 +256,14 @@ class MarkdownDocument:
         )
         if self.chapter_model:
             print(
-                f"Pydantic model built for '{self.chapter_model.chapter_title_text}' with {len(self.chapter_model.document_elements)} elements."
+                f"INFO: Pydantic model built for '{self.chapter_model.chapter_title_text}' with {len(self.chapter_model.document_elements)} elements."
             )
+            if not self._validate_internal_ids():
+                print(
+                    "WARNING: Internal ID validation failed after building Pydantic model. Structure may be inconsistent."
+                )
+        else:
+            print("ERROR: Pydantic chapter model could not be built.")
 
     def _parse_h3_sections_from_panel_blocks(
         self, panel_content_blocks: List[BlockToken]
@@ -270,11 +272,9 @@ class MarkdownDocument:
         current_h3_content_blocks_for_h4s: List[BlockToken] = []
         active_h3_title = "Initial Content"
         active_h3_block_node: Optional[Heading] = None
-        h3_counter_in_panel = 0  # For h3_number_in_panel
+        h3_counter_in_panel = 0
 
         if not panel_content_blocks:
-            # Even if no content, create one "Initial Content" H3 placeholder
-            # This might be adjusted based on desired behavior for empty panels
             h3_counter_in_panel += 1
             h3_pydantic_list.append(
                 H3Pydantic(
@@ -308,32 +308,33 @@ class MarkdownDocument:
                         )
                     )
 
-                    all_blocks_for_this_h3_section = []
+                    temp_h3_blocks_for_render = []
                     if active_h3_block_node:
-                        all_blocks_for_this_h3_section.append(active_h3_block_node)
-
-                    temp_doc_initial = Document(
+                        temp_h3_blocks_for_render.append(active_h3_block_node)
+                    if (
                         initial_md_for_prev_h3
-                    )  # Parse string back to blocks
-                    all_blocks_for_this_h3_section.extend(
-                        b
-                        for b in temp_doc_initial.children
-                        if isinstance(b, BlockToken)
-                    )
-                    for h4_sec in h4s_for_prev_h3:
-                        if h4_sec.mistletoe_h4_block:
-                            all_blocks_for_this_h3_section.append(
-                                h4_sec.mistletoe_h4_block
-                            )
-                        temp_doc_h4_content = Document(h4_sec.content_markdown)
-                        all_blocks_for_this_h3_section.extend(
+                    ):  # Only add if there's actual initial content
+                        temp_doc_initial = Document(initial_md_for_prev_h3)
+                        temp_h3_blocks_for_render.extend(
                             b
-                            for b in temp_doc_h4_content.children
+                            for b in temp_doc_initial.children
                             if isinstance(b, BlockToken)
                         )
+                    for h4_sec in h4s_for_prev_h3:
+                        if h4_sec.mistletoe_h4_block:
+                            temp_h3_blocks_for_render.append(h4_sec.mistletoe_h4_block)
+                        if (
+                            h4_sec.content_markdown
+                        ):  # Only add if there's actual H4 content
+                            temp_doc_h4_content = Document(h4_sec.content_markdown)
+                            temp_h3_blocks_for_render.extend(
+                                b
+                                for b in temp_doc_h4_content.children
+                                if isinstance(b, BlockToken)
+                            )
 
                     full_h3_md = render_blocks_to_markdown(
-                        all_blocks_for_this_h3_section, self.renderer
+                        temp_h3_blocks_for_render, self.renderer
                     )
                     h3_pydantic_list.append(
                         H3Pydantic(
@@ -362,25 +363,29 @@ class MarkdownDocument:
                 )
             )
 
-            all_blocks_for_this_h3_section = []
+            temp_h3_blocks_for_render_last = []
             if active_h3_block_node:
-                all_blocks_for_this_h3_section.append(active_h3_block_node)
-            temp_doc_initial_last = Document(initial_md_for_last_h3)
-            all_blocks_for_this_h3_section.extend(
-                b for b in temp_doc_initial_last.children if isinstance(b, BlockToken)
-            )
-            for h4_sec in h4s_for_last_h3:
-                if h4_sec.mistletoe_h4_block:
-                    all_blocks_for_this_h3_section.append(h4_sec.mistletoe_h4_block)
-                temp_doc_h4_content_last = Document(h4_sec.content_markdown)
-                all_blocks_for_this_h3_section.extend(
+                temp_h3_blocks_for_render_last.append(active_h3_block_node)
+            if initial_md_for_last_h3:
+                temp_doc_initial_last = Document(initial_md_for_last_h3)
+                temp_h3_blocks_for_render_last.extend(
                     b
-                    for b in temp_doc_h4_content_last.children
+                    for b in temp_doc_initial_last.children
                     if isinstance(b, BlockToken)
                 )
+            for h4_sec in h4s_for_last_h3:
+                if h4_sec.mistletoe_h4_block:
+                    temp_h3_blocks_for_render_last.append(h4_sec.mistletoe_h4_block)
+                if h4_sec.content_markdown:
+                    temp_doc_h4_content_last = Document(h4_sec.content_markdown)
+                    temp_h3_blocks_for_render_last.extend(
+                        b
+                        for b in temp_doc_h4_content_last.children
+                        if isinstance(b, BlockToken)
+                    )
 
             full_h3_md = render_blocks_to_markdown(
-                all_blocks_for_this_h3_section, self.renderer
+                temp_h3_blocks_for_render_last, self.renderer
             )
             h3_pydantic_list.append(
                 H3Pydantic(
@@ -392,21 +397,6 @@ class MarkdownDocument:
                     h3_number_in_panel=h3_counter_in_panel,
                 )
             )
-        elif (
-            not h3_pydantic_list and not panel_content_blocks
-        ):  # An empty panel still gets an "Initial Content" H3
-            h3_counter_in_panel += 1
-            h3_pydantic_list.append(
-                H3Pydantic(
-                    heading_text="Initial Content",
-                    mistletoe_h3_block=None,
-                    initial_content_markdown="",
-                    h4_sections=[],
-                    original_full_markdown="",
-                    h3_number_in_panel=h3_counter_in_panel,
-                )
-            )
-
         return h3_pydantic_list
 
     def _parse_h4_sections_from_h3_blocks(
@@ -417,7 +407,7 @@ class MarkdownDocument:
         initial_content_for_h3_blocks: List[BlockToken] = []
         active_h4_block_node: Optional[Heading] = None
         is_before_first_h4 = True
-        h4_counter_in_h3 = 0  # For h4_number_in_h3
+        h4_counter_in_h3 = 0
 
         if not h3_content_blocks:
             return "", []
@@ -474,7 +464,73 @@ class MarkdownDocument:
         )
         return initial_content_markdown_for_h3, h4_pydantic_list
 
-    # --- Listing Methods ---
+    def _validate_internal_ids(self) -> bool:
+        """
+        Validates the integrity of panel_number_in_doc, h3_number_in_panel,
+        and h4_number_in_h3 to ensure they are present and unique within their scopes.
+        Returns True if valid, False otherwise (and prints warnings).
+        """
+        if not self.chapter_model:
+            print("VALIDATE_ID_ERROR: Chapter model not built. Cannot validate IDs.")
+            return False  # Cannot validate if model doesn't exist
+
+        is_valid = True
+        panel_doc_numbers_seen: Set[int] = set()
+
+        for element_idx, element in enumerate(self.chapter_model.document_elements):
+            if isinstance(element, PanelPydantic):
+                if element.panel_number_in_doc is None:
+                    print(
+                        f"VALIDATE_ID_WARNING: Panel '{element.panel_title_text}' (element #{element_idx}) is missing 'panel_number_in_doc'."
+                    )
+                    is_valid = False
+                    continue  # Cannot validate H3s if panel ID is missing for context
+                if element.panel_number_in_doc in panel_doc_numbers_seen:
+                    print(
+                        f"VALIDATE_ID_WARNING: Duplicate 'panel_number_in_doc' {element.panel_number_in_doc} for Panel '{element.panel_title_text}'."
+                    )
+                    is_valid = False
+                panel_doc_numbers_seen.add(element.panel_number_in_doc)
+
+                h3_numbers_in_panel_seen: Set[int] = set()
+                for h3_idx, h3_section in enumerate(element.h3_sections):
+                    if (
+                        h3_section.h3_number_in_panel is None
+                    ):  # Should have been assigned
+                        print(
+                            f"VALIDATE_ID_WARNING: H3 '{h3_section.heading_text}' (H3 #{h3_idx+1}) in Panel ID {element.panel_number_in_doc} is missing 'h3_number_in_panel'."
+                        )
+                        is_valid = False
+                        continue  # Cannot validate H4s if H3 ID is missing
+                    if h3_section.h3_number_in_panel in h3_numbers_in_panel_seen:
+                        print(
+                            f"VALIDATE_ID_WARNING: Duplicate 'h3_number_in_panel' {h3_section.h3_number_in_panel} in Panel ID {element.panel_number_in_doc}."
+                        )
+                        is_valid = False
+                    h3_numbers_in_panel_seen.add(h3_section.h3_number_in_panel)
+
+                    h4_numbers_in_h3_seen: Set[int] = set()
+                    for h4_idx, h4_section in enumerate(h3_section.h4_sections):
+                        if (
+                            h4_section.h4_number_in_h3 is None
+                        ):  # Should have been assigned
+                            print(
+                                f"VALIDATE_ID_WARNING: H4 '{h4_section.heading_text}' (H4 #{h4_idx+1}) under H3 ID {h3_section.h3_number_in_panel} (Panel ID {element.panel_number_in_doc}) is missing 'h4_number_in_h3'."
+                            )
+                            is_valid = False
+                            continue
+                        if h4_section.h4_number_in_h3 in h4_numbers_in_h3_seen:
+                            print(
+                                f"VALIDATE_ID_WARNING: Duplicate 'h4_number_in_h3' {h4_section.h4_number_in_h3} under H3 ID {h3_section.h3_number_in_panel} (Panel ID {element.panel_number_in_doc})."
+                            )
+                            is_valid = False
+                        h4_numbers_in_h3_seen.add(h4_section.h4_number_in_h3)
+
+        if is_valid:
+            print("INFO: Internal ID validation passed.")
+        return is_valid
+
+    # --- Listing Methods (remain same as numeric_ids version) ---
     def list_all_h2_sections(self) -> List[Dict[str, Any]]:
         if not self.chapter_model:
             return []
@@ -492,9 +548,7 @@ class MarkdownDocument:
                     if element.title_text
                     else f"Generic Content Block {overall_section_counter}"
                 )
-                element_id = (
-                    f"generic-{overall_section_counter}"  # Unique ID for generic
-                )
+                element_id = f"generic-{overall_section_counter}"
             elif isinstance(element, PanelPydantic):
                 title = element.panel_title_text
                 is_panel = True
@@ -512,14 +566,13 @@ class MarkdownDocument:
     def list_panels(self) -> List[PanelPydantic]:
         if not self.chapter_model:
             return []
-        # Ensure panels are sorted by their document number for consistent listing
         return sorted(
             [
                 el
                 for el in self.chapter_model.document_elements
                 if isinstance(el, PanelPydantic)
             ],
-            key=lambda p: p.panel_number_in_doc or 0,  # Safety for Optional int
+            key=lambda p: p.panel_number_in_doc or 0,
         )
 
     def get_panel_by_number(self, panel_doc_number: int) -> Optional[PanelPydantic]:
@@ -564,6 +617,7 @@ class MarkdownDocument:
     def list_targetable_sections_in_panel(
         self, panel: PanelPydantic
     ) -> List[Dict[str, Any]]:
+        # (Definition from numeric_ids version is fine)
         if not panel:
             return []
         targets = []
@@ -628,7 +682,7 @@ class MarkdownDocument:
                 current_display_number += 1
         return targets
 
-    # --- Getters for Content (Updated to use numeric IDs where appropriate) ---
+    # --- Getters for Content (remain same as numeric_ids version) ---
     def get_section_markdown_for_api(
         self,
         panel_id: int,
@@ -641,9 +695,7 @@ class MarkdownDocument:
             return f"Error: Panel ID '{panel_id}' not found."
 
         if h3_id_in_panel is None:
-            return self.get_panel_full_markdown(
-                panel
-            )  # panel_full_markdown uses original_full_markdown of H3s
+            return self.get_panel_full_markdown(panel)
 
         h3_section = self.get_h3_by_number(panel, h3_id_in_panel)
         if not h3_section:
@@ -655,7 +707,7 @@ class MarkdownDocument:
             return h3_section.initial_content_markdown
 
         if h4_id_in_h3 is None:
-            return h3_section.original_full_markdown  # This is the full H3 section
+            return h3_section.original_full_markdown
 
         h4_section_model = self.get_h4_by_number(h3_section, h4_id_in_h3)
         if not h4_section_model:
@@ -663,7 +715,6 @@ class MarkdownDocument:
                 f"Error: H4 ID '{h4_id_in_h3}' not found in H3 ID '{h3_id_in_panel}'."
             )
 
-        # Return H4 heading + its content for API
         h4_blocks = []
         if h4_section_model.mistletoe_h4_block:
             h4_blocks.append(h4_section_model.mistletoe_h4_block)
@@ -676,16 +727,13 @@ class MarkdownDocument:
         return render_blocks_to_markdown(h4_blocks, self.renderer)
 
     def get_panel_full_markdown(self, panel_data: PanelPydantic) -> str:
-        # (Definition from v3 is fine, relies on H3.original_full_markdown)
         if not panel_data or not isinstance(panel_data, PanelPydantic):
             return "Error: Invalid panel data provided."
         panel_blocks_to_render = []
         if panel_data.mistletoe_h2_block:
             panel_blocks_to_render.append(panel_data.mistletoe_h2_block)
         for h3_item in panel_data.h3_sections:
-            if (
-                h3_item.original_full_markdown
-            ):  # This should be the full H3 section including its heading
+            if h3_item.original_full_markdown:
                 temp_h3_doc = Document(h3_item.original_full_markdown)
                 valid_children = [
                     b
@@ -693,20 +741,15 @@ class MarkdownDocument:
                     if b is not None and isinstance(b, BlockToken)
                 ]
                 panel_blocks_to_render.extend(valid_children)
-        if (
-            not panel_blocks_to_render and panel_data.mistletoe_h2_block is None
-        ):  # Truly empty panel
+        if not panel_blocks_to_render and panel_data.mistletoe_h2_block is None:
             return f"Panel '{panel_data.panel_title_text}' appears empty."
-        elif (
-            not panel_blocks_to_render and panel_data.mistletoe_h2_block
-        ):  # Only H2 exists
+        elif not panel_blocks_to_render and panel_data.mistletoe_h2_block:
             return render_blocks_to_markdown(
                 [panel_data.mistletoe_h2_block], self.renderer
             )
         return render_blocks_to_markdown(panel_blocks_to_render, self.renderer)
 
     def get_h3_subsection_full_markdown(self, h3_subsection_data: H3Pydantic) -> str:
-        # (Definition from v3 is fine - returns original_full_markdown)
         if not h3_subsection_data or not isinstance(h3_subsection_data, H3Pydantic):
             return "Error: Invalid H3 subsection data provided."
         return h3_subsection_data.original_full_markdown
@@ -714,7 +757,6 @@ class MarkdownDocument:
     def get_h4_subsubsection_full_markdown(
         self, h4_subsubsection_data: H4Pydantic
     ) -> str:
-        # (Definition from v3 is fine - assembles H4 heading + its content)
         if not h4_subsubsection_data or not isinstance(
             h4_subsubsection_data, H4Pydantic
         ):
@@ -730,7 +772,7 @@ class MarkdownDocument:
                 if b is not None and isinstance(b, BlockToken)
             ]
             h4_blocks_to_render.extend(valid_children)
-        if not h4_blocks_to_render:  # If only heading exists or empty
+        if not h4_blocks_to_render:
             return (
                 render_blocks_to_markdown(
                     [h4_subsubsection_data.mistletoe_h4_block], self.renderer
@@ -740,7 +782,7 @@ class MarkdownDocument:
             )
         return render_blocks_to_markdown(h4_blocks_to_render, self.renderer)
 
-    # --- Modification Methods ---
+    # --- Modification Methods (remain same as numeric_ids version) ---
     def update_h3_section_with_api_suggestions(
         self,
         panel_id: int,
@@ -751,18 +793,20 @@ class MarkdownDocument:
     ) -> bool:
         panel = self.get_panel_by_number(panel_id)
         if not panel:
-            print(f"Panel ID '{panel_id}' not found.")
+            print(f"ERROR: Panel ID '{panel_id}' not found.")
             return False
         h3 = self.get_h3_by_number(panel, h3_id_in_panel)
         if not h3:
-            print(f"H3 ID '{h3_id_in_panel}' not found in Panel ID '{panel_id}'.")
+            print(
+                f"ERROR: H3 ID '{h3_id_in_panel}' not found in Panel ID '{panel_id}'."
+            )
             return False
 
         h3.api_suggested_enhancement_needed = should_enhance
         h3.api_suggested_enhancement_type = enhancement_type
         h3.api_suggested_enhancement_reason = enhancement_reason
         print(
-            f"API suggestions for H3 ID '{h3.h3_number_in_panel}' ('{h3.heading_text}') recorded."
+            f"INFO: API suggestions for H3 ID '{h3.h3_number_in_panel}' ('{h3.heading_text}') recorded."
         )
         return True
 
@@ -771,16 +815,16 @@ class MarkdownDocument:
     ) -> bool:
         panel = self.get_panel_by_number(panel_id)
         if not panel:
-            print(f"Panel ID '{panel_id}' not found.")
+            print(f"ERROR: Panel ID '{panel_id}' not found.")
             return False
         h3 = self.get_h3_by_number(panel, h3_id_in_panel)
         if not h3:
-            print(f"H3 ID '{h3_id_in_panel}' not found.")
+            print(f"ERROR: H3 ID '{h3_id_in_panel}' not found.")
             return False
 
         h3.api_improved_markdown = improved_markdown
         print(
-            f"API improved markdown for H3 ID '{h3.h3_number_in_panel}' ('{h3.heading_text}') recorded."
+            f"INFO: API improved markdown for H3 ID '{h3.h3_number_in_panel}' ('{h3.heading_text}') recorded."
         )
         return True
 
@@ -794,27 +838,22 @@ class MarkdownDocument:
     ) -> bool:
         panel = self.get_panel_by_number(panel_id)
         if not panel:
-            print(f"Panel ID '{panel_id}' not found.")
+            print(f"ERROR: Panel ID '{panel_id}' not found.")
             return False
 
-        if h3_id_in_panel is None:  # Target is the entire H2 Panel
-            print(f"Warning: Replacing entire content of Panel ID '{panel_id}'.")
-            # This logic requires careful thought: new_markdown_content would be the content *under* the H2
-            # The H2 heading itself (panel.mistletoe_h2_block) is preserved.
-            # We need to re-parse new_markdown_content into new H3 sections.
+        if h3_id_in_panel is None:
+            print(f"WARNING: Replacing entire content of Panel ID '{panel_id}'.")
             temp_doc_for_new_panel_content = Document(new_markdown_content)
             new_h3_sections = self._parse_h3_sections_from_panel_blocks(
                 temp_doc_for_new_panel_content.children
             )
             panel.h3_sections = new_h3_sections
-            print(
-                f"Entire content of Panel ID '{panel_id}' replaced (H3s and H4s re-parsed)."
-            )
+            print(f"INFO: Entire content of Panel ID '{panel_id}' replaced.")
             return True
 
         h3_section = self.get_h3_by_number(panel, h3_id_in_panel)
         if not h3_section:
-            print(f"H3 ID '{h3_id_in_panel}' not found.")
+            print(f"ERROR: H3 ID '{h3_id_in_panel}' not found.")
             return False
 
         if is_h3_initial_content_target:
@@ -822,11 +861,10 @@ class MarkdownDocument:
             h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
                 h3_section
             )
-            print(f"Initial content of H3 ID '{h3_id_in_panel}' updated.")
+            print(f"INFO: Initial content of H3 ID '{h3_id_in_panel}' updated.")
             return True
 
-        if h4_id_in_h3 is None:  # Target is the entire H3 section
-            # new_markdown_content should be the complete H3 section including its heading
+        if h4_id_in_h3 is None:
             temp_doc_new_h3 = Document(new_markdown_content)
             if not (
                 temp_doc_new_h3.children
@@ -834,35 +872,34 @@ class MarkdownDocument:
                 and temp_doc_new_h3.children[0].level == 3
             ):
                 print(
-                    f"Error: New content for H3 ID '{h3_id_in_panel}' must start with an H3 heading."
+                    f"ERROR: New content for H3 ID '{h3_id_in_panel}' must start with an H3 heading."
                 )
                 return False
 
             h3_section.original_full_markdown = new_markdown_content
             h3_section.mistletoe_h3_block = temp_doc_new_h3.children[0]
             h3_section.heading_text = get_heading_text(h3_section.mistletoe_h3_block)
-            h3_content_blocks = temp_doc_new_h3.children[
-                1:
-            ]  # Content after the H3 heading
+            h3_content_blocks = temp_doc_new_h3.children[1:]
             h3_section.initial_content_markdown, h3_section.h4_sections = (
                 self._parse_h4_sections_from_h3_blocks(h3_content_blocks)
             )
-            print(f"Entire H3 section ID '{h3_id_in_panel}' updated and re-parsed.")
+            print(
+                f"INFO: Entire H3 section ID '{h3_id_in_panel}' updated and re-parsed."
+            )
             return True
 
-        # Target is an H4 section's content (new_markdown_content is just the content part)
         h4_section = self.get_h4_by_number(h3_section, h4_id_in_h3)
         if not h4_section:
-            print(f"H4 ID '{h4_id_in_h3}' not found.")
+            print(f"ERROR: H4 ID '{h4_id_in_h3}' not found.")
             return False
 
-        h4_section.content_markdown = (
-            new_markdown_content  # Update H4's own content string
-        )
+        h4_section.content_markdown = new_markdown_content
         h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
             h3_section
-        )  # Regenerate parent H3's full MD
-        print(f"Content of H4 ID '{h4_id_in_h3}' in H3 ID '{h3_id_in_panel}' updated.")
+        )
+        print(
+            f"INFO: Content of H4 ID '{h4_id_in_h3}' in H3 ID '{h3_id_in_panel}' updated."
+        )
         return True
 
     def add_content_to_target(
@@ -876,17 +913,17 @@ class MarkdownDocument:
     ) -> bool:
         panel = self.get_panel_by_number(panel_id)
         if not panel:
-            print(f"Panel ID '{panel_id}' not found.")
+            print(f"ERROR: Panel ID '{panel_id}' not found.")
             return False
         if h3_id_in_panel is None:
             print(
-                "Error: Cannot directly add content to H2 Panel this way. Target H3 or H4."
+                "ERROR: Cannot directly add content to H2 Panel this way. Target H3 or H4."
             )
             return False
 
         h3_section = self.get_h3_by_number(panel, h3_id_in_panel)
         if not h3_section:
-            print(f"H3 ID '{h3_id_in_panel}' not found.")
+            print(f"ERROR: H3 ID '{h3_id_in_panel}' not found.")
             return False
 
         target_name = ""
@@ -905,7 +942,7 @@ class MarkdownDocument:
         elif h4_id_in_h3 is not None:
             h4_section = self.get_h4_by_number(h3_section, h4_id_in_h3)
             if not h4_section:
-                print(f"H4 ID '{h4_id_in_h3}' not found.")
+                print(f"ERROR: H4 ID '{h4_id_in_h3}' not found.")
                 return False
             if position == "start":
                 h4_section.content_markdown = (
@@ -919,7 +956,7 @@ class MarkdownDocument:
             modified = True
         else:
             print(
-                "Error: Target for adding content (H3 Initial or H4) not clearly specified."
+                "ERROR: Target for adding content (H3 Initial or H4) not clearly specified."
             )
             return False
 
@@ -928,12 +965,11 @@ class MarkdownDocument:
                 h3_section
             )
             print(
-                f"Successfully added content to {target_name} (position: {position})."
+                f"INFO: Successfully added content to {target_name} (position: {position})."
             )
         return modified
 
     def _regenerate_h3_full_markdown(self, h3_section: H3Pydantic) -> str:
-        # (Definition from v3 is fine)
         blocks_for_render = []
         if h3_section.mistletoe_h3_block:
             blocks_for_render.append(h3_section.mistletoe_h3_block)
@@ -953,7 +989,6 @@ class MarkdownDocument:
         return render_blocks_to_markdown(blocks_for_render, self.renderer)
 
     def reconstruct_and_render_document(self) -> str:
-        # (Definition from v3 is fine)
         if not self.chapter_model:
             return self.raw_content or ""
         all_final_blocks: List[BlockToken] = []
@@ -995,13 +1030,12 @@ class MarkdownDocument:
         return render_blocks_to_markdown(all_final_blocks, self.renderer)
 
     def save_document(self, output_filepath: str) -> bool:
-        # (Definition from v3 is fine)
         rendered_content = self.reconstruct_and_render_document()
         try:
             with open(output_filepath, "w", encoding="utf-8") as f:
                 f.write(rendered_content)
-            print(f"Document successfully saved to '{output_filepath}'.")
+            print(f"INFO: Document successfully saved to '{output_filepath}'.")
             return True
         except Exception as e:
-            print(f"Error saving document to '{output_filepath}': {e}")
+            print(f"ERROR: Error saving document to '{output_filepath}': {e}")
             return False
