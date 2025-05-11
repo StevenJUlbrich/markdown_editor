@@ -2,7 +2,14 @@
 from typing import Any, Dict, List, Optional
 
 # Assuming document_model.py (with Pydantic models) is in the same directory or PYTHONPATH
-from document_model import H3Pydantic, H4Pydantic, MarkdownDocument, PanelPydantic
+# Make sure to import GenericContentPydantic if it's not already implicitly available via MarkdownDocument
+from document_model import (
+    GenericContentPydantic,
+    H3Pydantic,
+    H4Pydantic,
+    MarkdownDocument,
+    PanelPydantic,
+)
 
 
 class AppController:
@@ -37,9 +44,8 @@ class AppController:
         output_lines = [f"Chapter: {self.doc_model.chapter_model.chapter_title_text}"]
 
         for i, element in enumerate(self.doc_model.chapter_model.document_elements):
-            if (
-                element.type == "generic"
-            ):  # Assuming GenericContentPydantic has a 'type' field or check isinstance
+            # Corrected type checking here:
+            if isinstance(element, GenericContentPydantic):
                 output_lines.append(
                     f"  Generic Content Block {i+1} (preview: {element.content_markdown[:50].replace('\n', ' ')}...)"
                 )
@@ -47,9 +53,14 @@ class AppController:
                 output_lines.append(f"  Panel: {element.panel_title_text}")
                 for h3_section in element.h3_sections:
                     output_lines.append(f"    H3: {h3_section.heading_text}")
-                    if h3_section.initial_content_markdown.strip():
+                    # Check if initial_content_markdown exists and is not empty before trying to access/format it
+                    if (
+                        hasattr(h3_section, "initial_content_markdown")
+                        and h3_section.initial_content_markdown
+                        and h3_section.initial_content_markdown.strip()
+                    ):
                         output_lines.append(
-                            f"      H4 (Implicit Initial Content): {h3_section.initial_content_markdown[:40].replace('\n', ' ')}..."
+                            f"      Content (under H3 before H4s): {h3_section.initial_content_markdown[:40].replace('\n', ' ')}..."
                         )
                     for h4_section in h3_section.h4_sections:
                         output_lines.append(
@@ -156,9 +167,7 @@ class AppController:
         if not self.doc_model:
             print("Error: No document loaded to modify content.")
             return False
-        if (
-            not h3_title_fragment
-        ):  # Ensure H3 is specified for current modification logic
+        if not h3_title_fragment:
             print("Error: H3 sub-section must be specified for content modification.")
             return False
 
