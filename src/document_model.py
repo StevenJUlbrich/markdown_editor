@@ -115,46 +115,81 @@ class MarkdownDocument:
         expected_outer_heading_level: Optional[int] = None,
     ) -> List[BlockToken]:
         """
-        If blocks_to_check is a single BlockCode that likely contains Markdown
+        If blocks_to_check contains primarily a single BlockCode that likely contains Markdown
         (language hint is 'markdown' or empty), this function parses its content
         and returns the inner blocks. It also attempts to remove a duplicated inner
         heading if it matches the expected_outer_heading_text and level.
+        It's made more robust to handle optional empty paragraphs around the code block.
         """
-        # Filter out potential empty paragraphs if they are the only thing around a code block
-        # This makes the "single block" check more robust for common cases.
-        meaningful_blocks = [
-            b
-            for b in blocks_to_check
-            if not (isinstance(b, Paragraph) and not b.children)
-        ]
+        if not blocks_to_check:
+            return []
 
-        if len(meaningful_blocks) == 1 and isinstance(meaningful_blocks[0], BlockCode):
-            code_block: BlockCode = meaningful_blocks[0]
-            # Allow unwrapping if language is 'markdown' OR if language is empty (common for ``` content ```)
-            if code_block.language.lower() == "markdown" or code_block.language == "":
+        # Attempt to find the main BlockCode token, ignoring surrounding empty Paragraphs
+        main_code_block: Optional[BlockCode] = None
+        other_meaningful_blocks_exist = False
+
+        temp_blocks_for_logging = []
+        for i, b in enumerate(blocks_to_check):
+            temp_blocks_for_logging.append(f"  Block {i}: Type={type(b).__name__}")
+            if isinstance(b, Paragraph) and not b.children:
+                continue  # Skip empty paragraphs
+            if isinstance(b, BlockCode):
+                if main_code_block is None:  # First BlockCode found
+                    main_code_block = b
+                else:  # More than one BlockCode, or BlockCode after other meaningful content
+                    other_meaningful_blocks_exist = True
+                    break
+            else:  # Another type of meaningful block
+                other_meaningful_blocks_exist = True
+                break
+
+        # Diagnostic print
+        # print(f"DEBUG_UNWRAP: For H'{expected_outer_heading_text}': blocks_to_check had {len(blocks_to_check)} items. Found main_code_block: {main_code_block is not None}, other_meaningful_blocks_exist: {other_meaningful_blocks_exist}")
+        # if blocks_to_check:
+        #     print("DEBUG_UNWRAP: Original blocks_to_check types:")
+        #     for orig_b in blocks_to_check:
+        #         print(f"  - {type(orig_b).__name__}" + (f" lang='{orig_b.language}'" if isinstance(orig_b, BlockCode) else ""))
+
+        if main_code_block is not None and not other_meaningful_blocks_exist:
+            code_block = main_code_block  # Use the identified BlockCode
+            if (
+                code_block.language.lower() == "markdown" or code_block.language == ""
+            ):  # Check language
+                outer_heading_for_log = expected_outer_heading_text or "Unknown Section"
                 print(
-                    f"INFO: Attempting to unwrap a code block (lang: '{code_block.language}') under heading '{expected_outer_heading_text or 'Unknown'}'. Block content preview: {str(code_block.children)[:100]}..."
+                    f"INFO: Attempting to unwrap a code block (lang: '{code_block.language}') under heading '{outer_heading_for_log}'. Preview: {str(code_block.children)[:70]}..."
                 )
-                inner_markdown_string = "".join(
-                    child.content
-                    for child in code_block.children
-                    if hasattr(child, "content")
-                )
+
+                # Extract content from BlockCode children (which are RawText tokens)
+                inner_markdown_string = ""
+                if hasattr(code_block, "children"):
+                    for child in code_block.children:
+                        if hasattr(child, "content"):
+                            inner_markdown_string += child.content
 
                 if not inner_markdown_string.strip():
-                    print("INFO: Unwrapped code block was empty.")
+                    print(
+                        f"INFO: Unwrapped code block for '{outer_heading_for_log}' was empty."
+                    )
                     return []
 
-                inner_doc = Document(inner_markdown_string)
-                unwrapped_blocks = list(inner_doc.children)
-
-                if (
-                    not unwrapped_blocks
-                ):  # Parsing the inner string resulted in no blocks
+                try:
+                    inner_doc = Document(inner_markdown_string)
+                    unwrapped_blocks = list(inner_doc.children)
+                except Exception as e:
                     print(
-                        f"WARNING: Parsing inner content of code block for '{expected_outer_heading_text}' resulted in no blocks. Original string: '{inner_markdown_string[:100]}...'"
+                        f"ERROR: Failed to parse inner Markdown string during unwrap for '{outer_heading_for_log}': {e}"
                     )
-                    return []  # Return empty list if inner parse is empty
+                    print(
+                        f"       Inner Markdown was: {inner_markdown_string[:200]}..."
+                    )
+                    return blocks_to_check  # Return original if inner parse fails
+
+                if not unwrapped_blocks:
+                    print(
+                        f"WARNING: Parsing inner content of code block for '{outer_heading_for_log}' resulted in no blocks. Original string: '{inner_markdown_string[:100]}...'"
+                    )
+                    return []
 
                 # Check for and remove duplicated inner heading
                 if (
@@ -164,16 +199,30 @@ class MarkdownDocument:
                     and expected_outer_heading_level is not None
                 ):
                     inner_heading_node: Heading = unwrapped_blocks[0]
+                    inner_heading_text = get_heading_text(inner_heading_node).strip()
+                    outer_heading_text_stripped = expected_outer_heading_text.strip()
+
                     if (
                         inner_heading_node.level == expected_outer_heading_level
-                        and get_heading_text(inner_heading_node).strip().lower()
-                        == expected_outer_heading_text.strip().lower()
-                    ):  # Case-insensitive match for safety
+                        and inner_heading_text.lower()
+                        == outer_heading_text_stripped.lower()
+                    ):
                         print(
-                            f"INFO: Removed duplicated inner heading '{get_heading_text(inner_heading_node)}' from unwrapped content."
+                            f"INFO: Removed duplicated inner heading '{inner_heading_text}' from unwrapped content of '{outer_heading_for_log}'."
                         )
                         return unwrapped_blocks[1:]
+                    else:
+                        print(
+                            f"DEBUG_UNWRAP: Inner heading '{inner_heading_text}' (L{inner_heading_node.level}) did not match outer '{outer_heading_text_stripped}' (L{expected_outer_heading_level}). Not removing."
+                        )
                 return unwrapped_blocks
+            else:
+                print(
+                    f"DEBUG_UNWRAP: Code block under '{expected_outer_heading_text}' has language '{code_block.language}', not 'markdown' or empty. Not unwrapping."
+                )
+        # else:
+        # print(f"DEBUG_UNWRAP: No single, primary markdown code block found for '{expected_outer_heading_text}'. Not unwrapping.")
+
         return blocks_to_check
 
     def load_and_process(self, filepath: str) -> bool:
@@ -369,10 +418,16 @@ class MarkdownDocument:
                     and current_h3_content_blocks_for_h4s
                 ):
                     h3_counter_in_panel += 1
+
+                    # Determine the expected outer heading text for unwrapping
+                    expected_h3_text_for_unwrap = (
+                        active_h3_title if active_h3_block_node else None
+                    )
+
                     cleaned_h3_content_blocks = self._unwrap_markdown_code_block(
                         current_h3_content_blocks_for_h4s,
-                        active_h3_title if active_h3_block_node else None,
-                        3 if active_h3_block_node else None,
+                        expected_h3_text_for_unwrap,
+                        3,  # H3 level
                     )
                     initial_md_for_prev_h3, h4s_for_prev_h3 = (
                         self._parse_h4_sections_from_h3_blocks(
@@ -425,10 +480,13 @@ class MarkdownDocument:
 
         if active_h3_block_node or current_h3_content_blocks_for_h4s:
             h3_counter_in_panel += 1
+            expected_h3_text_for_unwrap_last = (
+                active_h3_title if active_h3_block_node else None
+            )
             cleaned_h3_content_blocks_last = self._unwrap_markdown_code_block(
                 current_h3_content_blocks_for_h4s,
-                active_h3_title if active_h3_block_node else None,
-                3 if active_h3_block_node else None,
+                expected_h3_text_for_unwrap_last,
+                3,  # H3 level
             )
             initial_md_for_last_h3, h4s_for_last_h3 = (
                 self._parse_h4_sections_from_h3_blocks(cleaned_h3_content_blocks_last)
@@ -472,11 +530,11 @@ class MarkdownDocument:
             h3_counter_in_panel += 1
             cleaned_initial_blocks = self._unwrap_markdown_code_block(
                 panel_content_blocks, None, None
-            )  # No expected outer H3 here
+            )
             initial_md, h4s = self._parse_h4_sections_from_h3_blocks(
                 cleaned_initial_blocks
             )
-            temp_blocks_render = []  # For original_full_markdown
+            temp_blocks_render = []
             if initial_md:
                 temp_blocks_render.extend(Document(initial_md).children)
             for h4_sec in h4s:
@@ -576,7 +634,6 @@ class MarkdownDocument:
         return initial_content_markdown_for_h3, h4_pydantic_list
 
     def _validate_internal_ids(self) -> bool:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             print("VALIDATE_ID_ERROR: Chapter model not built. Cannot validate IDs.")
             return False
@@ -633,7 +690,6 @@ class MarkdownDocument:
         return is_valid
 
     def list_all_h2_sections(self) -> List[Dict[str, Any]]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             return []
         sections = []
@@ -665,7 +721,6 @@ class MarkdownDocument:
         return sections
 
     def list_panels(self) -> List[PanelPydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             return []
         return sorted(
@@ -678,7 +733,6 @@ class MarkdownDocument:
         )
 
     def get_panel_by_number(self, panel_doc_number: int) -> Optional[PanelPydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             return None
         for element in self.chapter_model.document_elements:
@@ -692,7 +746,6 @@ class MarkdownDocument:
     def get_h3_by_number(
         self, panel: PanelPydantic, h3_panel_number: int
     ) -> Optional[H3Pydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not panel:
             return None
         for h3_section in panel.h3_sections:
@@ -703,7 +756,6 @@ class MarkdownDocument:
     def get_h4_by_number(
         self, h3_section: H3Pydantic, h4_h3_number: int
     ) -> Optional[H4Pydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not h3_section:
             return None
         for h4_section in h3_section.h4_sections:
@@ -712,7 +764,6 @@ class MarkdownDocument:
         return None
 
     def list_h3_sections_in_panel(self, panel: PanelPydantic) -> List[Dict[str, Any]]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not panel:
             return []
         return [
@@ -723,7 +774,6 @@ class MarkdownDocument:
     def list_targetable_sections_in_panel(
         self, panel: PanelPydantic
     ) -> List[Dict[str, Any]]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not panel:
             return []
         targets = []
@@ -784,9 +834,6 @@ class MarkdownDocument:
                 current_display_number += 1
         return targets
 
-    # --- Getters for Content ---
-    # ... (get_section_markdown_for_api, get_panel_full_markdown, get_h3_subsection_full_markdown,
-    #      get_h4_subsubsection_full_markdown remain the same as document_model_targeted_enh_v1)
     def get_section_markdown_for_api(
         self,
         panel_id: int,
@@ -934,9 +981,6 @@ class MarkdownDocument:
         return True
 
     # --- Existing Modification Methods ---
-    # ... (update_h3_section_with_api_suggestions, update_h3_section_with_improved_markdown,
-    #      update_target_content, add_content_to_target, _regenerate_h3_full_markdown
-    #      remain the same as document_model_targeted_enh_v1)
     def update_h3_section_with_api_suggestions(
         self,
         panel_id: int,
