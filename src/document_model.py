@@ -38,18 +38,38 @@ def render_blocks_to_markdown(
         print(f"Problematic valid_blocks (first 5): {valid_blocks[:5]}")
         return "Error: Could not render blocks."
 
-    # Use the passed renderer if available, otherwise create a new one for this scope
-    active_renderer = renderer if renderer else MarkdownRenderer()
-    return active_renderer.render(temp_doc).strip()
+    # Use the passed renderer if available. If not, this function cannot proceed without one.
+    if renderer is None:
+        print(
+            "CRITICAL ERROR in render_blocks_to_markdown: Renderer not provided and lazy init removed here."
+        )
+        # Fallback to creating one for this specific call, though this might also fail if there's a general issue.
+        # This indicates a problem with how the main renderer is being managed or passed.
+        print(
+            "Attempting to create a temporary renderer for render_blocks_to_markdown..."
+        )
+        try:
+            renderer = MarkdownRenderer()
+        except Exception as e_render:
+            print(
+                f"Failed to create temporary renderer in render_blocks_to_markdown: {e_render}"
+            )
+            return "Error: Renderer unavailable."
+
+    return renderer.render(temp_doc).strip()
 
 
 # --- Attempt to instantiate the renderer at the module level ---
 _MODULE_LEVEL_RENDERER_INSTANCE: Optional[MarkdownRenderer] = None
 try:
     _MODULE_LEVEL_RENDERER_INSTANCE = MarkdownRenderer()
-    print("INFO: Module-level MarkdownRenderer instantiated successfully.")
+    print(
+        "INFO: Module-level MarkdownRenderer instantiated successfully during import of document_model."
+    )
 except Exception as e:
-    print(f"CRITICAL ERROR: Could not instantiate module-level MarkdownRenderer: {e}")
+    print(
+        f"CRITICAL ERROR during import: Could not instantiate module-level MarkdownRenderer: {e}"
+    )
     print("Further Mistletoe operations will likely fail.")
     # _MODULE_LEVEL_RENDERER_INSTANCE remains None
 
@@ -109,21 +129,29 @@ class MarkdownDocument:
         self.mistletoe_doc: Optional[Document] = None
         self.chapter_model: Optional[ChapterPydantic] = None
 
+        print(
+            f"DEBUG: MarkdownDocument __init__ called. _MODULE_LEVEL_RENDERER_INSTANCE is {'NOT None' if _MODULE_LEVEL_RENDERER_INSTANCE else 'None'}."
+        )
         if _MODULE_LEVEL_RENDERER_INSTANCE is None:
-            # This will likely raise the same error if module-level instantiation failed
-            # Or, if module-level failed, we might not want to proceed or have a fallback.
+            # This should ideally not happen if the module-level instantiation succeeded.
+            # If it does, it points to a more complex issue (e.g. module reloading, or the initial error was missed)
             print(
-                "WARNING: Module-level renderer was not available. Attempting __init__ instantiation."
+                "CRITICAL ERROR in MarkdownDocument __init__: Module-level renderer is None. Mistletoe is likely not set up correctly."
             )
-            self.renderer: MarkdownRenderer = MarkdownRenderer()
+            # Raising an error here to make it clear that proceeding is problematic.
+            raise RuntimeError(
+                "Mistletoe MarkdownRenderer could not be initialized at the module level. Cannot proceed."
+            )
         else:
             self.renderer: MarkdownRenderer = _MODULE_LEVEL_RENDERER_INSTANCE
+            print(
+                "INFO: MarkdownDocument __init__ assigned pre-existing module-level MarkdownRenderer."
+            )
 
         if filepath:
             self.load_and_process(filepath)
 
     def load_and_process(self, filepath: str) -> bool:
-        # ... (load_and_process method remains the same as in markdown_document_model_pydantic_v2) ...
         self.filepath = filepath
         try:
             with open(self.filepath, "r", encoding="utf-8") as f:
@@ -199,6 +227,7 @@ class MarkdownDocument:
                         current_generic_blocks[0], Heading
                     ):
                         generic_title = get_heading_text(current_generic_blocks[0])
+                    # Pass the instance renderer
                     generic_md = render_blocks_to_markdown(
                         current_generic_blocks, self.renderer
                     )
@@ -252,6 +281,7 @@ class MarkdownDocument:
                 current_generic_blocks[0], Heading
             ):
                 generic_title = get_heading_text(current_generic_blocks[0])
+            # Pass the instance renderer
             generic_md = render_blocks_to_markdown(
                 current_generic_blocks, self.renderer
             )
@@ -334,6 +364,7 @@ class MarkdownDocument:
                             if b is not None and isinstance(b, BlockToken)
                         )
 
+                    # Pass the instance renderer
                     full_h3_md = render_blocks_to_markdown(
                         all_blocks_for_this_h3_section, self.renderer
                     )
@@ -379,6 +410,7 @@ class MarkdownDocument:
                     if b is not None and isinstance(b, BlockToken)
                 )
 
+            # Pass the instance renderer
             full_h3_md = render_blocks_to_markdown(
                 all_blocks_for_this_h3_section, self.renderer
             )
@@ -416,6 +448,7 @@ class MarkdownDocument:
             if is_h4_heading:
                 is_before_first_h4 = False
                 if active_h4_block_node:
+                    # Pass the instance renderer
                     h4_content_md = render_blocks_to_markdown(
                         current_h4_content_blocks, self.renderer
                     )
@@ -437,6 +470,7 @@ class MarkdownDocument:
                 block_idx += 1
 
         if active_h4_block_node:
+            # Pass the instance renderer
             h4_content_md = render_blocks_to_markdown(
                 current_h4_content_blocks, self.renderer
             )
@@ -448,12 +482,13 @@ class MarkdownDocument:
                 )
             )
 
+        # Pass the instance renderer
         initial_content_markdown_for_h3 = render_blocks_to_markdown(
             initial_content_for_h3_blocks, self.renderer
         )
         return initial_content_markdown_for_h3, h4_pydantic_list
 
-    # --- Listing Methods ---
+    # --- Listing Methods (remain the same) ---
     def list_all_h2_sections(self) -> List[Dict[str, Any]]:
         if not self.chapter_model:
             return []
@@ -573,7 +608,7 @@ class MarkdownDocument:
                 current_display_number += 1
         return targets
 
-    # --- Getters for Content ---
+    # --- Getters for Content (remain the same) ---
     def get_panel_pydantic(self, panel_title_fragment: str) -> Optional[PanelPydantic]:
         if not self.chapter_model:
             return None
@@ -675,7 +710,7 @@ class MarkdownDocument:
             return f"Error: H4 section '{h4_title}' not found in '{h3_section.heading_text}'."
         return self.get_h4_subsubsection_full_markdown(h4_section_model)
 
-    # --- Modification Methods ---
+    # --- Modification Methods (remain the same) ---
     def update_h3_section_with_api_suggestions(
         self,
         panel_title: str,
@@ -684,7 +719,6 @@ class MarkdownDocument:
         enhancement_type: Optional[str],
         enhancement_reason: Optional[str],
     ) -> bool:
-        """Updates an H3Pydantic object with suggestions from an API call."""
         panel = self.get_panel_pydantic(panel_title)
         if not panel:
             print(f"Cannot update suggestions: Panel '{panel_title}' not found.")
@@ -707,7 +741,6 @@ class MarkdownDocument:
     def update_h3_section_with_improved_markdown(
         self, panel_title: str, h3_title: str, improved_markdown: str
     ) -> bool:
-        """Updates an H3Pydantic object with the API-generated improved Markdown content."""
         panel = self.get_panel_pydantic(panel_title)
         if not panel:
             print(f"Cannot set improved markdown: Panel '{panel_title}' not found.")
