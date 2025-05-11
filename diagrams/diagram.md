@@ -1,6 +1,8 @@
+# Classes and their relationships in the document structure
+
 ```mermaid
 classDiagram
-    direction LR
+    direction TD
 
     class ChapterPydantic {
         +chapter_title_text: str
@@ -26,9 +28,10 @@ classDiagram
         +mistletoe_h3_block: Optional[Any]
         +initial_content_markdown: str
         +original_full_markdown: str
+        +api_suggested_enhancement_needed: Optional[bool]
+        +api_suggested_enhancement_type: Optional[str]
+        +api_suggested_enhancement_reason: Optional[str]
         +api_improved_markdown: Optional[str]
-        +api_recommendation: Optional[str]
-        +api_reason: Optional[str]
         +h4_sections: List[H4Pydantic]
     }
 
@@ -43,10 +46,10 @@ classDiagram
     PanelPydantic   o-- "0..*" H3Pydantic : contains
     H3Pydantic      o-- "0..*" H4Pydantic : contains
 
-    note for ChapterPydantic "Top-level document structure"
-    note for PanelPydantic "Represents an H2 'Panel' section"
-    note for H3Pydantic "Represents an H3 sub-section within a Panel"
-    note for H4Pydantic "Represents an H4 sub-sub-section within an H3"
-    note for GenericContentPydantic "Represents content outside of Panels (e.g., Chapter Overview)"
+    note for ChapterPydantic "Top-level document structure, holds H1 and a list of generic or panel elements."
+    note for GenericContentPydantic "Represents content outside of Panels (e.g., Chapter Overview, Learning Objectives). Stores rendered Markdown and original Mistletoe blocks."
+    note for PanelPydantic "Represents an H2 'Panel' section. Holds H2 Mistletoe block, panel number, and a list of H3 sections."
+    note for H3Pydantic "Represents an H3 sub-section. Stores its H3 Mistletoe block, initial content, H4s, full original Markdown, and API-related fields."
+    note for H4Pydantic "Represents an H4 sub-sub-section. Stores its H4 Mistletoe block and its content as Markdown."
 
 ```
