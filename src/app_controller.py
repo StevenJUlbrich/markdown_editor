@@ -1,9 +1,13 @@
 # app_controller.py
 from typing import Any, Dict, List, Optional
 
-from diff_utils import generate_text_diff  # Import the new utility
+from diff_utils import generate_text_diff
 from document_model import H3Pydantic  # Assuming numeric IDs
 from document_model import MarkdownDocument, PanelPydantic
+
+# Pydantic v2 provides model_dump_json, v1 uses .json()
+# We'll try to use model_dump_json and fallback or adjust if needed based on Pydantic version.
+# For simplicity in this example, we'll assume Pydantic v2+ .model_dump_json() is available.
 
 
 class AppController:
@@ -18,15 +22,8 @@ class AppController:
         self.current_selected_panel_id: Optional[int] = None
         self.last_listed_targetable_sections: List[Dict[str, Any]] = []
 
-    # ... (load_document, list_all_h2_sections_for_cli, list_panels_for_cli,
-    #      select_panel_by_number_for_cli, get_current_selected_panel_title,
-    #      list_h3_sections_in_selected_panel_for_cli, list_and_get_h3_content_for_cli,
-    #      list_targetable_sections_in_selected_panel_for_cli,
-    #      _get_target_info_from_display_number, prepare_multiple_selected_sections_for_api,
-    #      update_target_section_content, add_to_target_section_content - these remain the same as numeric_ids_v2) ...
-
+    # ... (all previous methods from the diff tool implementation remain here) ...
     def load_document(self, filepath: str) -> bool:
-        """Loads a Markdown document using the model."""
         self.doc_model = MarkdownDocument()
         self.current_selected_panel_id = None
         self.last_listed_targetable_sections = []
@@ -69,7 +66,6 @@ class AppController:
             return False
 
     def get_current_selected_panel_title(self) -> Optional[str]:
-        """Helper to get the title of the currently selected panel for display."""
         if not self.doc_model or self.current_selected_panel_id is None:
             return None
         panel = self.doc_model.get_panel_by_number(self.current_selected_panel_id)
@@ -129,6 +125,7 @@ class AppController:
                 f"Error: Could not retrieve selected panel (ID: {self.current_selected_panel_id})."
             )
             return None
+
         self.last_listed_targetable_sections = (
             self.doc_model.list_targetable_sections_in_panel(panel)
         )
@@ -266,9 +263,7 @@ class AppController:
         if h3_section.api_improved_markdown is None:
             return f"H3 section '{h3_section.heading_text}' (ID: {h3_id_in_panel}) has no API-improved content to compare."
 
-        if (
-            h3_section.original_full_markdown is None
-        ):  # Should not happen if parsing is correct
+        if h3_section.original_full_markdown is None:
             return f"H3 section '{h3_section.heading_text}' (ID: {h3_id_in_panel}) is missing original_full_markdown."
 
         return generate_text_diff(
@@ -314,6 +309,81 @@ class AppController:
                 f"Controller: Failed to record API enhancement for H3 ID {h3_id_in_panel}."
             )
         return success
+
+    def get_chapter_model_as_json(self) -> Optional[str]:
+        """
+        Exports the current self.doc_model.chapter_model to a JSON string,
+        excluding Mistletoe block objects for readability.
+        """
+        if not self.doc_model or not self.doc_model.chapter_model:
+            print("Error: No document loaded or chapter model not built.")
+            return None
+
+        try:
+            # Define fields to exclude. This can get complex for nested models.
+            # We want to exclude any field that stores raw Mistletoe token objects.
+            exclude_mistletoe_fields = {
+                "mistletoe_h1_block": True,
+                "mistletoe_blocks": True,  # from GenericContentPydantic
+                "mistletoe_h2_block": True,  # from PanelPydantic
+                "mistletoe_h3_block": True,  # from H3Pydantic
+                "mistletoe_h4_block": True,  # from H4Pydantic
+            }
+
+            # For Pydantic v2 (model_dump_json)
+            # The exclude structure for nested models:
+            # 'parent_list': {'__all__': {'field_in_list_item_to_exclude': True}}
+            # or 'parent_list': {int_index: {'field_to_exclude': True}}
+
+            # We need to construct the exclude dict carefully for nested models
+            # Pydantic v2's model_dump(exclude=...) is more flexible before dumping to json
+
+            # Simplified exclusion for this example, focusing on top-level and known nested fields
+            # A more robust way might involve a custom encoder or iterating the model dict
+
+            # Using model_dump to create a dict first, then remove unwanted keys before json.dumps
+            # This gives more control for complex nested exclusions if Pydantic's direct exclude is tricky.
+
+            # For Pydantic v2 .model_dump_json(exclude=...)
+            # This is a common pattern but might need adjustment based on exact model structure and Pydantic version specifics
+            # for excluding fields from items within lists of models.
+            # A simpler way for Pydantic v2 is to get the dict first, then filter.
+            chapter_dict = self.doc_model.chapter_model.model_dump(exclude_none=True)
+
+            # Recursively remove mistletoe blocks for cleaner JSON
+            def clean_dict(d):
+                if isinstance(d, dict):
+                    return {
+                        k: clean_dict(v)
+                        for k, v in d.items()
+                        if not k.startswith("mistletoe_")  # General rule
+                    }
+                elif isinstance(d, list):
+                    return [clean_dict(i) for i in d]
+                return d
+
+            cleaned_chapter_dict = clean_dict(chapter_dict)
+
+            import json
+
+            return json.dumps(cleaned_chapter_dict, indent=2)
+
+        except AttributeError as e:
+            # Fallback for Pydantic v1 style or other issues
+            print(
+                f"Note: Using basic Pydantic .json() export due to AttributeError ({e}). Mistletoe objects might be included or cause errors."
+            )
+            try:
+                # Pydantic v1 .json() does not have such granular exclude for nested __all__
+                # This will likely include Mistletoe objects or fail if they are not serializable.
+                # A custom encoder with .json(encoder=custom_encoder) would be needed for Pydantic v1.
+                return self.doc_model.chapter_model.json(indent=2)
+            except Exception as json_err:
+                print(f"Error during JSON export: {json_err}")
+                return f'{{"error": "Could not serialize chapter model to JSON: {json_err}"}}'
+        except Exception as e:
+            print(f"Error during JSON export: {e}")
+            return f'{{"error": "Could not serialize chapter model to JSON: {e}"}}'
 
     def save_document(self, output_filepath: str) -> bool:
         if not self.doc_model:
