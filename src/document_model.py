@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 # --- Helper Function ---
 def get_heading_text(heading_node: Heading) -> str:
-    """Extracts the plain text from a Mistletoe Heading node."""
     text = ""
     if hasattr(heading_node, "children"):
         for child in heading_node.children:
@@ -22,7 +21,6 @@ def get_heading_text(heading_node: Heading) -> str:
 def render_blocks_to_markdown(
     blocks: List[BlockToken], renderer: Optional[MarkdownRenderer] = None
 ) -> str:
-    """Renders a list of Mistletoe block tokens to a Markdown string, filtering out None values."""
     if not blocks:
         return ""
     valid_blocks = [b for b in blocks if b is not None and isinstance(b, BlockToken)]
@@ -56,8 +54,6 @@ except Exception as e:
 
 # --- Pydantic Models ---
 class H4Pydantic(BaseModel):
-    """Represents an H4 sub-sub-section."""
-
     heading_text: str
     mistletoe_h4_block: Optional[Any] = None
     content_markdown: str = ""
@@ -65,8 +61,6 @@ class H4Pydantic(BaseModel):
 
 
 class H3Pydantic(BaseModel):
-    """Represents an H3 sub-section within a Panel."""
-
     heading_text: str
     mistletoe_h3_block: Optional[Any] = None
     initial_content_markdown: str = ""
@@ -80,8 +74,6 @@ class H3Pydantic(BaseModel):
 
 
 class PanelPydantic(BaseModel):
-    """Represents an H2 Panel section."""
-
     panel_title_text: str
     mistletoe_h2_block: Optional[Any] = None
     h3_sections: List[H3Pydantic] = Field(default_factory=list)
