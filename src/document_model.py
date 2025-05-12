@@ -990,9 +990,23 @@ class MarkdownDocument:
         if not h3:
             print(f"ERROR: H3 ID '{h3_id_in_panel}' not found.")
             return False
-        h3.api_improved_markdown = improved_markdown
+
+        # Sanitize markdown block if wrapped in triple backticks
+        cleaned = improved_markdown.strip()
+        if cleaned.startswith("```markdown") or cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if len(lines) > 2 and lines[0].startswith("```"):
+                cleaned = "\n".join(lines[1:-1]).strip()
+
+        # Optional: Remove redundant heading if it's already present
+        lines = cleaned.splitlines()
+        expected_heading = f"### {h3.heading_text.strip()}"
+        if lines and lines[0].strip() == expected_heading:
+            cleaned = "\n".join(lines[1:]).strip()
+
+        h3.api_improved_markdown = cleaned
         print(
-            f"INFO: API improved markdown for H3 ID '{h3.h3_number_in_panel}' ('{h3.heading_text}') recorded."
+            f"INFO: Sanitized and stored API improved markdown for H3 ID '{h3.h3_number_in_panel}' ('{h3.heading_text}')"
         )
         return True
 
