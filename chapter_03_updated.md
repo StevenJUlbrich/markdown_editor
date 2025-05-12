@@ -33,115 +33,106 @@ By the end of this chapter, readers will be able to:
 ---
 
 ## Panel 1: The Resource Detective
-### Scene Description
-
 ```markdown
 ### Scene Description
-In a dynamic operations room, the infrastructure team meticulously applies the systematic USE method checklist to diagnose a batch processing failure in the core banking system. A whiteboard at the center of the room displays a flowchart illustrating the USE method steps: Utilization, Saturation, and Errors. Surrounding the whiteboard, engineers collaborate in small groups, each focused on analyzing specific system components such as databases, application servers, and network interfaces.
-
-An annotated diagram accompanies the scene, visually breaking down the system architecture. Each component is labeled with its corresponding USE metrics, highlighting real-time observations: CPU utilization spikes in the database, network saturation at a critical router, and error logs from an application server. The visual emphasizes the structured evaluation process, showing how the team systematically isolates bottlenecks and identifies root causes through the USE framework.
+The scene depicts an infrastructure team systematically applying the USE method checklist to diagnose a batch processing failure in the core banking system. A detailed diagram accompanies the visual, illustrating the engineers collaboratively analyzing utilization, saturation, and error metrics for each system component. The diagram highlights key elements such as resource dashboards, a checklist workflow, and interconnections between system components, providing a clear representation of the troubleshooting process. This visual aids in understanding how the USE method framework is applied in a structured and efficient manner to uncover performance bottlenecks.
 ```
 ### Teaching Narrative
 The USE Method provides a comprehensive framework for measuring resource health through three key dimensions: Utilization (how busy the resource is), Saturation (how much queueing is occurring), and Errors (failure counts). This systematic measurement approach ensures no resource constraints go unexamined, creating a methodical path through performance investigation. For banking infrastructure, USE metrics create a structured approach to identifying bottlenecks that might otherwise remain hidden during critical financial processing.
-### Common Example of the Problem
-
 ```markdown
 ### Common Example of the Problem
 
-A bank's nightly batch reconciliation process has been gradually taking longer to complete, now threatening its 6 AM completion deadline before daily operations begin. The operations team has tried various troubleshooting approaches but struggled to identify the root cause. Without a systematic approach to resource measurement, they focused on the most visible components and overlooked the actual constraint: disk I/O saturation on storage systems handling transaction journaling. This issue became apparent only after applying the USE methodology systematically across all resources.
+A bank's nightly batch reconciliation process has been gradually taking longer to complete, now threatening its 6 AM completion deadline before daily operations begin. The operations team has tried various troubleshooting approaches: examining application logs, increasing server CPU and memory allocation, and optimizing database queries. None of these efforts have improved completion times. Without a systematic approach to resource measurement, the team keeps focusing on the most visible components while missing the actual constraint: disk I/O saturation on storage systems handling the transaction journaling.
 
-The following table compares the troubleshooting actions attempted by the team versus the actual root cause identified:
+To illustrate this more clearly, the diagram below provides a timeline of the troubleshooting steps taken and how the USE Method eventually led to identifying the root cause:
 
-| Troubleshooting Action                 | Intended Focus               | Outcome                                                                 |
-|----------------------------------------|------------------------------|-------------------------------------------------------------------------|
-| Examining application logs             | Application-level issues     | No significant anomalies found in log data.                            |
-| Increasing server CPU allocation       | CPU utilization              | Utilization remained low; no performance improvement observed.         |
-| Increasing server memory allocation    | Memory capacity              | Memory usage was already within acceptable limits; no improvement.     |
-| Optimizing database queries            | Query execution performance  | Query performance improved slightly but did not address the slowdown.  |
-| Applying USE methodology systematically| All resource dimensions      | Identified disk I/O saturation as the root cause of the performance issue. |
-
-This structured analysis highlights the importance of applying a systematic framework like the USE Method to avoid misdiagnosing resource bottlenecks and ensure all potential constraints are assessed methodically.
 ```
-### SRE Best Practice: Evidence-Based Investigation
+[Diagram: Troubleshooting Timeline]
+1. **Initial Symptom Observed** (Batch process delay threatens 6 AM deadline)
+   - Operations team identifies a significant slowdown in the nightly reconciliation process.
 
+2. **Step 1: Application Logs Reviewed**
+   - No errors or anomalies found in application logs.
+
+3. **Step 2: Resource Scaling**
+   - CPU and memory resources for the server increased.
+   - No performance improvement observed.
+
+4. **Step 3: Database Query Optimization**
+   - Database queries were analyzed and optimized.
+   - Marginal improvement but issue persists.
+
+5. **Step 4: Applying the USE Method**
+   - **Utilization**: CPU and memory utilization levels are normal.
+   - **Saturation**: High disk queue length observed on storage systems.
+   - **Errors**: No significant failure counts detected.
+
+6. **Root Cause Identified: Disk I/O Saturation**
+   - Transaction journaling workload is overwhelming the storage system during batch processing.
+```
+
+This systematic breakdown highlights how the USE Method directs attention to overlooked resource constraints, ensuring a complete investigation and resolution path. By identifying disk I/O saturation, the team was able to implement targeted solutions such as storage system upgrades and workload distribution, bringing the batch process back within its time window.
+```
 ```markdown
 ### SRE Best Practice: Evidence-Based Investigation
 
-Implement the USE method comprehensively across all system resources by following this systematic checklist:
+Implement the USE method comprehensively across all system resources to ensure a thorough, evidence-based investigation. Use the checklist below to guide your analysis:
 
-#### USE Method Checklist
-1. **Inventory Resources**: Create a comprehensive list of resources to evaluate. Include CPU, memory, network interfaces, disk I/O, storage capacity, file descriptors, connection pools, thread pools, and any other critical components.
-2. **Measure Key Dimensions for Each Resource**:
-   - **Utilization**: Determine the percentage of time the resource is busy (0-100%).
-   - **Saturation**: Assess the extent of queued work that cannot be processed immediately.
-   - **Errors**: Record the count of error events associated with the resource.
-3. **Ensure Consistency**: Apply measurements uniformly across all resources, not just the ones that appear problematic.
-4. **Prioritize Investigation**: Focus analysis on resources with the highest utilization or saturation levels first.
-5. **Correlate Metrics**: Link resource metrics with application behavior to pinpoint underlying constraints.
-6. **Verify Findings**: Cross-reference identified bottlenecks with system performance data to confirm their impact.
+#### Resource Investigation Checklist
 
-#### Example Application
-Systematic USE analysis identified disk I/O saturation as the root cause of queued write operations during high-volume journal processing. This constraint, missed by traditional monitoring, was responsible for severe performance degradation during critical financial tasks.
+| Step | Action                                                                                      | Key Considerations                                                                                 |
+|------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| 1    | **Inventory Resources**: Identify all system resources to examine                          | Include CPU, memory, network interfaces, disk I/O, storage capacity, file descriptors, connection pools, thread pools |
+| 2    | **Measure Dimensions**: For each resource, collect metrics for:                            | - **Utilization**: Percentage of time the resource is busy (0-100%)                               |
+|      |                                                                                            | - **Saturation**: Extent of queued work that cannot be processed immediately                      |
+|      |                                                                                            | - **Errors**: Count of error events related to the resource                                       |
+| 3    | **Apply Consistency**: Measure all resources systematically, not just the obvious ones      | Ensure no resource is overlooked, even if it seems less likely to be a bottleneck                 |
+| 4    | **Prioritize Analysis**: Focus on resources with the highest utilization or saturation first | High metrics in these areas are more likely to indicate performance constraints                   |
+| 5    | **Correlate Metrics**: Link resource metrics to application performance                     | Identify the true constraints that are impacting system performance                               |
 
-This structured, evidence-based approach ensures that no resource bottleneck goes unnoticed, enabling faster, more accurate troubleshooting and resolution.
+#### Example Application of USE Method
+
+Through systematic USE analysis, the team identified disk I/O saturation as the primary bottleneck during high-volume journal processing. Write operations were queuing significantly, causing severe delays. Traditional monitoring had failed to highlight this issue, demonstrating the value of applying USE metrics consistently across all resources.
 ```
-### Banking Impact
-
 ```markdown
 ### Banking Impact
-Think of the batch reconciliation process as a factory assembly line producing a critical product: operational readiness for the next banking day. Each stage of the process must run smoothly and on time to ensure the "product" is delivered without defects. When a bottleneck forms—whether due to resource saturation, high utilization, or errors—it's like a machine on the assembly line breaking down, causing delays that ripple through the entire production flow.
-
-In banking, these delays translate to significant business consequences. If reconciliation misses its completion window, the "finished product" of operational readiness is incomplete: branch openings may be delayed, customer account balances remain unupdated, financial reporting deadlines are missed, and regulatory submissions are late. The backlog impacts not just internal operations but also customer trust and regulatory obligations. Much like a factory facing penalties for missed delivery deadlines, banks risk regulatory fines, damaged reputation, and operational inefficiencies when reconciliation failures occur. This analogy highlights why identifying and resolving bottlenecks using the USE method is mission-critical for ensuring a seamless financial ecosystem.
+Imagine a busy airport where flights are tightly scheduled throughout the day. If a single early morning flight is delayed due to a technical issue, the cascading effects ripple across the entire network: passengers miss connections, gates become overcrowded, crews are out of position, and the delays compound into a logistical nightmare. Similarly, in batch reconciliation processes within banking, missing a completion window sets off a chain reaction of disruptions. Branch openings may be delayed, leaving customers waiting for service. Account balances remain unupdated, creating confusion and potential mistrust. Financial reporting deadlines are missed, jeopardizing regulatory compliance and risking penalties. Just as an airport must operate with precision to maintain flow, banking systems rely on timely reconciliations to ensure smooth, uninterrupted operations across departments. The consequences extend beyond technical concerns, impacting customer satisfaction, compliance integrity, and the overall operational stability of the organization.
 ```
-### Implementation Guidance
-
 ```markdown
 ### Implementation Guidance
-1. Create a comprehensive resource inventory covering all infrastructure components.
-2. Implement standardized USE dashboards for each resource type and instance.
-3. Develop systematic troubleshooting runbooks that apply the USE methodology sequentially.
-4. Establish baseline performance across all resources during normal operations.
-5. Build automated analysis tools that flag anomalous USE metrics across the infrastructure.
+1. Create a comprehensive resource inventory covering all infrastructure components. Use automation scripts to periodically update the inventory and ensure accuracy.
 
-#### Example: Automating USE Metric Collection with Python
-To streamline the collection of Utilization, Saturation, and Error metrics, the following Python script leverages system monitoring tools (e.g., `psutil` for CPU/memory/disk metrics) and logs errors for further analysis. Customize this script based on your infrastructure's specific requirements.
-
+2. Implement standardized USE dashboards for each resource type and instance. For example, use a monitoring tool like Grafana to create dashboards. Below is a sample PromQL query for visualizing CPU utilization in Prometheus:
 ```
-import psutil
-import logging
+node_cpu_seconds_total{mode!="idle"} / sum(node_cpu_seconds_total) by (instance)
+   ```
+   The query calculates CPU utilization per instance. Visualize it using a line graph to monitor trends over time.
 
-# Configure logging for error tracking
-logging.basicConfig(filename='use_metrics.log', level=logging.ERROR, 
-format='%(asctime)s - %(levelname)s - %(message)s')
+   3. Develop systematic troubleshooting runbooks that apply the USE methodology sequentially. Include templates with steps for analyzing utilization, saturation, and errors. For instance:
+   - **Step 1**: Check CPU utilization for spikes using the dashboard.
+   - **Step 2**: Investigate saturation by examining queue depth metrics.
+   - **Step 3**: Correlate error logs with resource metrics to identify patterns.
 
-def collect_use_metrics():
-metrics = {}
+   4. Establish baseline performance across all resources during normal operations. Use these baselines to create threshold alerts in your monitoring system. For example, flag when utilization exceeds 80% or queue lengths grow beyond expected levels.
 
-    # Utilization: CPU and Memory utilization
-    metrics['cpu_utilization'] = psutil.cpu_percent(interval=1)
-    metrics['memory_utilization'] = psutil.virtual_memory().percent
+   5. Build automated analysis tools that flag anomalous USE metrics across the infrastructure. Below is a Python snippet leveraging the Prometheus API to detect high saturation:
+   ```
+import requests
 
-    # Saturation: Disk I/O wait (example metric for saturation)
-    disk_io = psutil.disk_io_counters()
-    metrics['disk_io_wait'] = disk_io.write_time + disk_io.read_time
+PROMETHEUS_URL = "http://prometheus-server/api/v1/query"
+QUERY = 'sum(rate(node_disk_io_time_seconds_total[5m])) by (device)'
 
-    # Errors: Mock example for capturing error counts
-    metrics['error_count'] = 0  # Replace with actual error collection logic
+response = requests.get(PROMETHEUS_URL, params={'query': QUERY})
+data = response.json()
 
-    # Log and return metrics
-    if metrics['error_count'] > 0:
-        logging.error(f"Error count detected: {metrics['error_count']}")
-
-    return metrics
-
-# Example: Collect and print metrics
-if __name__ == "__main__":
-use_metrics = collect_use_metrics()
-print("Collected USE Metrics:", use_metrics)
-```
-
-6. Integrate scripts like the example above into your monitoring pipelines to automate data collection and anomaly detection.
-```
+for result in data['data']['result']:
+device = result['metric']['device']
+saturation = float(result['value'][1])
+if saturation > 0.8:
+print(f"High saturation detected on {device}: {saturation}")
+   ```
+   Integrate such tools into a CI/CD pipeline or alerting system to proactively address performance issues.
+   ```
 ## Panel 2: The Invisible Bottleneck
 ### Scene Description
 Team discovering disk I/O saturation during peak write periods causing nightly batch processing failures despite normal CPU and memory metrics. Visual shows contrast between healthy CPU/memory dashboards and critical disk queue metrics.

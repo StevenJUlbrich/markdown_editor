@@ -942,7 +942,8 @@ class MarkdownDocument:
                 f"ERROR: H3 section with title '{section_h3_title}' not found in Panel ID {panel_id}."
             )
             return False
-        target_h3_section.api_improved_markdown = new_markdown_content
+        cleaned = self._sanitize_markdown(section_h3_title, new_markdown_content)
+        target_h3_section.api_improved_markdown = cleaned
         target_h3_section.api_suggested_enhancement_needed = True
         print(
             f"INFO: API improved markdown set for H3 '{section_h3_title}' in Panel ID {panel_id}."
@@ -987,18 +988,7 @@ class MarkdownDocument:
             print(f"ERROR: H3 ID '{h3_id_in_panel}' not found.")
             return False
 
-        cleaned = improved_markdown.strip()
-        if cleaned.startswith("```markdown") or cleaned.startswith("```"):
-            lines = cleaned.splitlines()
-            if len(lines) > 2 and lines[0].startswith("```"):
-                cleaned = "\n".join(lines[1:-1]).strip()
-
-        # Strip redundant heading even if slightly malformed
-        lines = cleaned.splitlines()
-        expected_heading = f"### {h3.heading_text.strip().lower()}"
-        if lines and lines[0].strip().lower() == expected_heading:
-            cleaned = "\n".join(lines[1:]).strip()
-
+        cleaned = self._sanitize_markdown(h3.heading_text, improved_markdown)
         h3.api_improved_markdown = cleaned
         print(f"INFO: Cleaned and stored improved markdown for H3 '{h3.heading_text}'")
         return True
@@ -1139,11 +1129,18 @@ class MarkdownDocument:
         blocks_for_render = []
         if h3_section.mistletoe_h3_block:
             blocks_for_render.append(h3_section.mistletoe_h3_block)
+
         if h3_section.initial_content_markdown:
-            initial_content_doc = Document(h3_section.initial_content_markdown)
+            content_lines = h3_section.initial_content_markdown.strip().splitlines()
+            heading_line = f"### {h3_section.heading_text.strip().lower()}"
+            if content_lines and content_lines[0].strip().lower() == heading_line:
+                content_lines = content_lines[1:]  # Strip duplicate heading
+            content = "\n".join(content_lines).strip()
+            initial_content_doc = Document(content)
             blocks_for_render.extend(
                 b for b in initial_content_doc.children if isinstance(b, BlockToken)
             )
+
         for h4_s in h3_section.h4_sections:
             if h4_s.mistletoe_h4_block:
                 blocks_for_render.append(h4_s.mistletoe_h4_block)
@@ -1152,7 +1149,21 @@ class MarkdownDocument:
                 blocks_for_render.extend(
                     b for b in h4_content_doc.children if isinstance(b, BlockToken)
                 )
+
         return render_blocks_to_markdown(blocks_for_render, self.renderer)
+
+    def _sanitize_markdown(self, heading_text: str, markdown: str) -> str:
+        cleaned = markdown.strip()
+        if cleaned.startswith("```markdown") or cleaned.startswith("```"):
+            lines = cleaned.splitlines()
+            if len(lines) > 2 and lines[0].startswith("```"):
+                cleaned = "\n".join(lines[1:-1]).strip()
+
+        lines = cleaned.splitlines()
+        expected_heading = f"### {heading_text.strip().lower()}"
+        if lines and lines[0].strip().lower() == expected_heading:
+            cleaned = "\n".join(lines[1:]).strip()
+        return cleaned
 
     # --- Reconstruction and Saving ---
     def reconstruct_and_render_document(self) -> str:
