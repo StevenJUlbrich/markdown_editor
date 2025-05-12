@@ -914,6 +914,11 @@ class MarkdownDocument:
             )
             return False
         cleaned = self._sanitize_markdown(section_h3_title, new_markdown_content)
+
+        # Check if the heading was preserved and add it if missing
+        if not cleaned.strip().startswith(f"### {section_h3_title}"):
+            cleaned = f"### {section_h3_title}\n\n{cleaned}"
+
         target_h3_section.api_improved_markdown = cleaned
         target_h3_section.api_suggested_enhancement_needed = True
         print(
