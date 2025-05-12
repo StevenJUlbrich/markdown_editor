@@ -205,7 +205,6 @@ class MarkdownDocument:
 
         return blocks_to_check
 
-    # ... [load_and_process, _parse_to_mistletoe_ast, _build_pydantic_model methods remain the same as document_model_unwrapping_v1] ...
     def load_and_process(self, filepath: str) -> bool:
         self.filepath = filepath
         try:
@@ -1244,13 +1243,17 @@ class MarkdownDocument:
 
         return rendered.strip()
 
-    # --- Reconstruction and Saving ---
     def reconstruct_and_render_document(self) -> str:
         if not self.chapter_model:
             return self.raw_content or ""
-        all_final_blocks: List[BlockToken] = []
+
+        all_final_blocks: List[BlockToken] = (
+            []
+        )  # Ensure BlockToken is imported or defined
+
         if self.chapter_model.mistletoe_h1_block:
             all_final_blocks.append(self.chapter_model.mistletoe_h1_block)
+
         for element in self.chapter_model.document_elements:
             if isinstance(element, GenericContentPydantic):
                 if element.mistletoe_blocks:
@@ -1260,7 +1263,7 @@ class MarkdownDocument:
                         if b is not None and isinstance(b, BlockToken)
                     )
                 elif element.content_markdown:
-                    generic_doc = Document(element.content_markdown)
+                    generic_doc = Document(element.content_markdown)  # Original logic
                     all_final_blocks.extend(
                         b
                         for b in generic_doc.children
@@ -1269,27 +1272,25 @@ class MarkdownDocument:
             elif isinstance(element, PanelPydantic):
                 if element.mistletoe_h2_block:
                     all_final_blocks.append(element.mistletoe_h2_block)
+
                 for h3_section in element.h3_sections:
+                    content_string_for_h3 = None
                     if h3_section.api_improved_markdown is not None:
-                        # Render the improved markdown for this H3 section
-                        improved_doc = Document(h3_section.api_improved_markdown)
+                        content_string_for_h3 = h3_section.api_improved_markdown
+                    elif (
+                        h3_section.original_full_markdown
+                    ):  # Ensure this field exists and is the one to use
+                        content_string_for_h3 = h3_section.original_full_markdown
+
+                    if content_string_for_h3:
+                        h3_doc = Document(content_string_for_h3)
                         all_final_blocks.extend(
                             b
-                            for b in improved_doc.children
+                            for b in h3_doc.children
                             if b is not None and isinstance(b, BlockToken)
                         )
-                    elif h3_section.original_full_markdown:
-                        # Render the original full markdown for this H3 section
-                        original_h3_doc = Document(h3_section.original_full_markdown)
-                        all_final_blocks.extend(
-                            b
-                            for b in original_h3_doc.children
-                            if b is not None and isinstance(b, BlockToken)
-                        )
-                    # Fallback if somehow original_full_markdown is empty but other parts are not
-                    # This should ideally be covered by original_full_markdown being correctly populated
-                    elif h3_section.mistletoe_h3_block:  # If only heading exists
-                        all_final_blocks.append(h3_section.mistletoe_h3_block)
+                    else:
+                        pass
 
         return render_blocks_to_markdown(all_final_blocks, self.renderer)
 

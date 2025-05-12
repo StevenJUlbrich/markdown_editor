@@ -335,6 +335,7 @@ def get_improved_markdown_for_section(
     panel_title_context: str,
     overall_panel_context_md: str,
 ) -> Optional[str]:
+
     if not original_h3_markdown_content or not original_h3_markdown_content.strip():
         print(
             f"[OpenAI Service] INFO: Skipping enhancement for empty or whitespace-only original content."
@@ -390,7 +391,10 @@ Please provide an improved version of this H3 sub-section.
         improved_markdown = response.choices[0].message.content
         if improved_markdown:
             # Ensure the response starts with the H3 heading if the API sometimes forgets
-            cleaned_improved_markdown = improved_markdown.strip()
+
+            # cleaned_improved_markdown = improved_markdown.strip()
+            cleaned_improved_markdown = strip_markdown_fences(improved_markdown).strip()
+
             expected_heading = f"### {h3_title_for_prompt}"
             if not cleaned_improved_markdown.startswith(
                 "### "
@@ -423,3 +427,29 @@ Please provide an improved version of this H3 sub-section.
             f"[OpenAI Service] ERROR: Unexpected error during content enhancement: {type(e).__name__} - {e}"
         )
         return None
+
+
+def strip_markdown_fences(markdown_content: str) -> str:
+    """
+    Strips markdown code fences from content returned by OpenAI.
+    """
+    if not markdown_content:
+        return markdown_content
+
+    cleaned = markdown_content.strip()
+    lines = cleaned.splitlines()
+
+    # Check if the content is wrapped in code fences
+    if (
+        len(lines) >= 2
+        and lines[0].strip().startswith("```markdown")
+        and lines[-1].strip() == "```"
+    ):
+        # Remove the first and last lines (the fences)
+        cleaned = "\n".join(lines[1:-1]).strip()
+
+        # Recursively clean in case there are nested fences
+        if cleaned.startswith("```"):
+            return strip_markdown_fences(cleaned)
+
+    return cleaned
