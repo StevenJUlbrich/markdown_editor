@@ -1163,27 +1163,31 @@ class MarkdownDocument:
             if len(lines) > 2 and lines[0].startswith("```"):
                 cleaned = "\n".join(lines[1:-1]).strip()
 
-        doc = Document(cleaned)
-        stripped_blocks = []
+        original_doc = Document(cleaned)
         lower_heading = heading_text.strip().lower()
 
-        for block in doc.children:
+        # Reconstruct a valid list of children
+        filtered_blocks = []
+        for block in original_doc.children:
             if isinstance(block, Heading) and block.level == 3:
                 block_heading = get_heading_text(block).strip().lower()
                 if block_heading == lower_heading:
                     continue
             if isinstance(block, BlockCode):
-                # You can choose to unwrap or drop
-                continue
-            stripped_blocks.append(block)
+                continue  # Drop triple backtick content entirely
+            filtered_blocks.append(block)
+
+        # Build new document for rendering
+        new_doc = Document("")  # dummy init to satisfy constructor
+        new_doc.children = filtered_blocks
 
         renderer = MarkdownRenderer()
         try:
-            doc.children = stripped_blocks
-            final = renderer.render(doc)
+            rendered = renderer.render(new_doc)
         finally:
             renderer.close()
-        return final.strip()
+
+        return rendered.strip()
 
     # --- Reconstruction and Saving ---
     def reconstruct_and_render_document(self) -> str:
