@@ -148,63 +148,6 @@ class MarkdownDocument:
             return True  # All children were RawText and all were whitespace
         return False
 
-    def _unwrap_markdown_code_block(
-        self,
-        blocks_to_check: List[BlockToken],
-        expected_outer_heading_text: Optional[str] = None,
-        expected_outer_heading_level: Optional[int] = None,
-    ) -> List[BlockToken]:
-        """
-        Prevents overzealous unwrapping of ```markdown blocks that already start with valid headings.
-        """
-        if not blocks_to_check:
-            return []
-
-        substantive_blocks = [
-            b for b in blocks_to_check if not self._is_paragraph_effectively_empty(b)
-        ]
-
-        if len(substantive_blocks) == 1 and isinstance(
-            substantive_blocks[0], BlockCode
-        ):
-            code_block: BlockCode = substantive_blocks[0]
-            if code_block.language.lower() in ("markdown", ""):
-                inner_markdown_string = ""
-                if hasattr(code_block, "children"):
-                    for child_span in code_block.children:
-                        if hasattr(child_span, "content"):
-                            inner_markdown_string += child_span.content
-
-                if not inner_markdown_string.strip():
-                    return []
-
-                try:
-                    inner_doc = Document(inner_markdown_string)
-                    unwrapped_blocks = list(inner_doc.children)
-                except Exception as e:
-                    print(f"ERROR: Failed to parse inner Markdown string: {e}")
-                    return blocks_to_check
-
-                # Check if the first unwrapped block is a heading and matches outer context
-                if (
-                    unwrapped_blocks
-                    and isinstance(unwrapped_blocks[0], Heading)
-                    and expected_outer_heading_text
-                    and expected_outer_heading_level is not None
-                ):
-                    inner_heading_text = get_heading_text(unwrapped_blocks[0]).strip()
-                    if (
-                        unwrapped_blocks[0].level == expected_outer_heading_level
-                        and inner_heading_text.lower()
-                        == expected_outer_heading_text.strip().lower()
-                    ):
-                        # Don’t strip matching headings anymore. Let them be.
-                        return unwrapped_blocks
-
-                return unwrapped_blocks
-
-        return blocks_to_check
-
     def load_and_process(self, filepath: str) -> bool:
         self.filepath = filepath
         try:
@@ -403,11 +346,11 @@ class MarkdownDocument:
                         active_h3_title if active_h3_block_node else None
                     )
 
-                    cleaned_h3_content_blocks = self._unwrap_markdown_code_block(
-                        current_h3_content_blocks_for_h4s,
-                        expected_h3_text_for_unwrap,
-                        3,
-                    )
+                    cleaned_h3_content_blocks = [
+                        block
+                        for block in current_h3_content_blocks_for_h4s
+                        if not self._is_paragraph_effectively_empty(block)
+                    ]
                     initial_md_for_prev_h3, h4s_for_prev_h3 = (
                         self._parse_h4_sections_from_h3_blocks(
                             cleaned_h3_content_blocks
@@ -462,9 +405,11 @@ class MarkdownDocument:
             expected_h3_text_for_unwrap_last = (
                 active_h3_title if active_h3_block_node else None
             )
-            cleaned_h3_content_blocks_last = self._unwrap_markdown_code_block(
-                current_h3_content_blocks_for_h4s, expected_h3_text_for_unwrap_last, 3
-            )
+            cleaned_h3_content_blocks_last = [
+                block
+                for block in current_h3_content_blocks_for_h4s
+                if not self._is_paragraph_effectively_empty(block)
+            ]
             initial_md_for_last_h3, h4s_for_last_h3 = (
                 self._parse_h4_sections_from_h3_blocks(cleaned_h3_content_blocks_last)
             )
@@ -505,9 +450,11 @@ class MarkdownDocument:
             )
         elif not h3_pydantic_list and panel_content_blocks:
             h3_counter_in_panel += 1
-            cleaned_initial_blocks = self._unwrap_markdown_code_block(
-                panel_content_blocks, None, None
-            )
+            cleaned_initial_blocks = [
+                block
+                for block in panel_content_blocks
+                if not self._is_paragraph_effectively_empty(block)
+            ]
             initial_md, h4s = self._parse_h4_sections_from_h3_blocks(
                 cleaned_initial_blocks
             )
@@ -563,11 +510,11 @@ class MarkdownDocument:
                     h4_counter_in_h3 += 1
 
                     expected_h4_text_for_unwrap = get_heading_text(active_h4_block_node)
-                    cleaned_h4_content_blocks = self._unwrap_markdown_code_block(
-                        current_h4_content_blocks,
-                        expected_h4_text_for_unwrap,
-                        4,  # H4 level
-                    )
+                    cleaned_h4_content_blocks = [
+                        block
+                        for block in current_h4_content_blocks
+                        if not self._is_paragraph_effectively_empty(block)
+                    ]
                     h4_content_md = render_blocks_to_markdown(
                         cleaned_h4_content_blocks, self.renderer
                     )
@@ -593,11 +540,11 @@ class MarkdownDocument:
         if active_h4_block_node:
             h4_counter_in_h3 += 1
             expected_h4_text_for_unwrap_last = get_heading_text(active_h4_block_node)
-            cleaned_h4_content_blocks_last = self._unwrap_markdown_code_block(
-                current_h4_content_blocks,
-                expected_h4_text_for_unwrap_last,
-                4,  # H4 level
-            )
+            cleaned_h4_content_blocks_last = [
+                block
+                for block in current_h4_content_blocks
+                if not self._is_paragraph_effectively_empty(block)
+            ]
             h4_content_md = render_blocks_to_markdown(
                 cleaned_h4_content_blocks_last, self.renderer
             )
