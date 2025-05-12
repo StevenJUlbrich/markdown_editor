@@ -1,39 +1,36 @@
+import codecs
 import logging
+import sys
 from logging.handlers import RotatingFileHandler
 
 
 def setup_logging(
-    log_file: str = "app.log", max_bytes: int = 5 * 1024 * 1024, backup_count: int = 5
+    log_file: str = "app.log",
+    max_bytes: int = 5 * 1024 * 1024,
+    backup_count: int = 5,
 ):
-    """
-    Sets up project-wide logging configuration.
-    Uses rotating file handler to prevent infinite growth.
-    Adds per-module logger support and optional metadata tags.
-    Call this early in your main entry points.
-
-    Parameters:
-    - log_file (str): The name of the log file to write to.
-    - max_bytes (int): Maximum size of each log file in bytes.
-    - backup_count (int): Number of backup files to retain.
-    """
-    log_formatter = logging.Formatter(
-        "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    fmt = "[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+    log_formatter = logging.Formatter(fmt, datefmt=datefmt)
 
     file_handler = RotatingFileHandler(
-        log_file, maxBytes=max_bytes, backupCount=backup_count
+        log_file,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",  # <-- NEW
     )
     file_handler.setFormatter(log_formatter)
 
-    stream_handler = logging.StreamHandler()
+    # wrap sys.stderr/stdout in a UTF-8 writer so CP-1252 never sees the emojis
+    utf8_stream = codecs.getwriter("utf-8")(sys.stderr.buffer, errors="replace")
+    stream_handler = logging.StreamHandler(stream=utf8_stream)
     stream_handler.setFormatter(log_formatter)
 
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-    root_logger.handlers = []  # Clear existing handlers to avoid duplicates
-    root_logger.addHandler(file_handler)
-    root_logger.addHandler(stream_handler)
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.handlers.clear()
+    root.addHandler(file_handler)
+    root.addHandler(stream_handler)
 
 
 def get_logger(module_name: str) -> logging.Logger:

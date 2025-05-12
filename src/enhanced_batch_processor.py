@@ -1,7 +1,4 @@
-# This is a new sketch file for refactoring BatchProcessor
-# We'll inject the updated OpenAI prompt handling logic from openai_service.py
-# and prepare to update main.py afterward to include folder-based automation
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
@@ -15,16 +12,15 @@ logger = get_logger(__name__)
 
 
 class EnhancedBatchProcessor:
-    def __init__(self, dry_run: bool = False):
+    def __init__(self, dry_run: bool = False, max_workers: int = 3):
         self.dry_run = dry_run
+        self.max_workers = max_workers
 
     def process_panel(self, doc: MarkdownDocument, panel: PanelPydantic) -> int:
         section_map = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
-
         if not section_map:
             return 0
 
-        # Compose context
         context_parts = [f"## {panel.panel_title_text}"]
         for section in ["Scene Description", "Teaching Narrative"]:
             if section_map.get(section):
@@ -84,7 +80,22 @@ class EnhancedBatchProcessor:
         output_folder.mkdir(exist_ok=True)
         all_files = list(input_folder.glob("*.md"))
 
-        for f in all_files:
-            self.process_file(f, output_folder)
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = {
+                executor.submit(self.process_file, f, output_folder): f
+                for f in all_files
+            }
+            for future in as_completed(futures):
+                f = futures[future]
+                try:
+                    success = future.result()
+                    if success:
+                        logger.info("✅ Processed: %s", f.name)
+                    else:
+                        logger.warning("⚠️ Failed to process: %s", f.name)
+                except Exception as e:
+                    logger.exception(
+                        "Unhandled error while processing file: %s", f.name
+                    )
 
         logger.info("Batch processing complete. Processed %d files.", len(all_files))
