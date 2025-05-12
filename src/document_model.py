@@ -7,6 +7,10 @@ from mistletoe.markdown_renderer import MarkdownRenderer
 from mistletoe.span_token import RawText  # Ensure RawText is imported
 from pydantic import BaseModel, Field
 
+from logging_config import setup_logging
+
+setup_logging()
+
 
 def _strip_outer_markdown_fences(markdown_text: str) -> str:
     """

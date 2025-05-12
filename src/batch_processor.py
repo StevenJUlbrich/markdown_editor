@@ -5,6 +5,9 @@ from typing import Any, Dict, List, Optional
 
 import openai_service
 from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
+from logging_config import setup_logging
+
+setup_logging()
 
 
 class BatchProcessor:

@@ -1,9 +1,30 @@
 # openai_service.py
 import json
+import logging
 import os  # For environment variables
 import re
 import time
 from typing import Any, Dict, List, Optional
+
+from logging_config import get_logger
+
+logger = get_logger(__name__)
+
+
+def handle_openai_response(response_content: str, section_title: str) -> str:
+    """
+    Process OpenAI response content and log any unexpected image markdown.
+    """
+    cleaned = response_content.strip()
+
+    if "![" in cleaned:
+        logger.warning(
+            "Image markdown detected in OpenAI response for section: '%s'",
+            section_title,
+        )
+
+    # Additional response sanitation can go here
+    return cleaned
 
 
 # --- Mock OpenAI Client ---

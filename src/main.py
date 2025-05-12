@@ -1,6 +1,10 @@
 # main.py
 from typing import Any, Dict, List, Optional
 
+from logging_config import setup_logging
+
+setup_logging()
+
 from app_controller import (
     AppController,
 )  # Assuming app_controller.py is in the same directory
