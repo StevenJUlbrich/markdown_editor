@@ -8,6 +8,31 @@ from mistletoe.span_token import RawText  # Ensure RawText is imported
 from pydantic import BaseModel, Field
 
 
+def _strip_outer_markdown_fences(markdown_text: str) -> str:
+    """
+    Strips common outer markdown code fences (```markdown ... ``` or ``` ... ```).
+    """
+    processed_text = markdown_text.strip()
+    lines = processed_text.splitlines()
+
+    if len(lines) >= 2:  # Needs at least two lines for fences (e.g., ```\n```)
+        starts_with_fence = lines[0].startswith("```")
+        ends_with_fence = lines[-1] == "```"
+
+        if starts_with_fence and ends_with_fence:
+            # Remove "markdown" language specifier if present on the first line
+            if lines[0].startswith("```markdown"):
+                # Check if it's just ```markdown or ```markdown followed by content on the same line
+                # This simple version assumes ```markdown is on its own line or only has whitespace after.
+                # A more robust regex might be needed for complex cases.
+                pass  # Handled by slicing [1:-1]
+
+            # Join the content between the fences
+            content_between_fences = "\n".join(lines[1:-1])
+            return content_between_fences.strip()
+    return processed_text  # Return original (stripped of outer whitespace) if not clearly fenced
+
+
 # --- Helper Function ---
 def get_heading_text(heading_node: Heading) -> str:
     text = ""
@@ -1005,54 +1030,82 @@ class MarkdownDocument:
         if not panel:
             print(f"ERROR: Panel ID '{panel_id}' not found.")
             return False
-        if h3_id_in_panel is None:
+
+        if h3_id_in_panel is None:  # Updating H2 Panel (entire panel content)
+            # This part already re-parses H3s. Consider if new_markdown_content here also needs fence stripping.
+            # For now, focusing on the H3 update case as per the problem.
             print(f"WARNING: Replacing entire content of Panel ID '{panel_id}'.")
+            # Potentially apply _strip_outer_markdown_fences to new_markdown_content here too if panels can be wrapped
             temp_doc_for_new_panel_content = Document(new_markdown_content)
             new_h3_sections = self._parse_h3_sections_from_panel_blocks(
-                temp_doc_for_new_panel_content.children
+                list(temp_doc_for_new_panel_content.children)  # Ensure it's a list
             )
             panel.h3_sections = new_h3_sections
             print(f"INFO: Entire content of Panel ID '{panel_id}' replaced.")
             return True
+
         h3_section = self.get_h3_by_number(panel, h3_id_in_panel)
         if not h3_section:
-            print(f"ERROR: H3 ID '{h3_id_in_panel}' not found.")
+            print(
+                f"ERROR: H3 ID '{h3_id_in_panel}' not found in Panel ID '{panel_id}'."
+            )
             return False
+
         if is_h3_initial_content_target:
-            h3_section.initial_content_markdown = new_markdown_content
+            # Initial content is usually smaller; direct assignment is often fine,
+            # but stripping could be applied here too if users paste fenced blocks.
+            h3_section.initial_content_markdown = _strip_outer_markdown_fences(
+                new_markdown_content
+            )
             h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
                 h3_section
             )
             print(f"INFO: Initial content of H3 ID '{h3_id_in_panel}' updated.")
             return True
-        if h4_id_in_h3 is None:
-            temp_doc_new_h3 = Document(new_markdown_content)
+
+        if h4_id_in_h3 is None:  # This means updating an entire H3 section's content
+            # Apply fence stripping to the incoming Markdown for the H3 section
+            processed_h3_content = _strip_outer_markdown_fences(new_markdown_content)
+
+            temp_doc_new_h3 = Document(processed_h3_content)
             if not (
                 temp_doc_new_h3.children
                 and isinstance(temp_doc_new_h3.children[0], Heading)
                 and temp_doc_new_h3.children[0].level == 3
             ):
                 print(
-                    f"ERROR: New content for H3 ID '{h3_id_in_panel}' must start with an H3 heading."
+                    f"ERROR: New content for H3 ID '{h3_id_in_panel}' must start with an H3 heading (after potential fence stripping)."
                 )
                 return False
-            h3_section.original_full_markdown = new_markdown_content
+
+            h3_section.original_full_markdown = (
+                processed_h3_content  # Store the processed (stripped) content
+            )
             h3_section.mistletoe_h3_block = temp_doc_new_h3.children[0]
             h3_section.heading_text = get_heading_text(h3_section.mistletoe_h3_block)
-            h3_content_blocks = temp_doc_new_h3.children[1:]
+
+            h3_content_blocks_for_h4_parsing = list(
+                temp_doc_new_h3.children[1:]
+            )  # Ensure it's a list
             (
                 h3_section.initial_content_markdown,
                 h3_section.h4_sections,
-            ) = self._parse_h4_sections_from_h3_blocks(h3_content_blocks)
+            ) = self._parse_h4_sections_from_h3_blocks(h3_content_blocks_for_h4_parsing)
             print(
-                f"INFO: Entire H3 section ID '{h3_id_in_panel}' updated and re-parsed."
+                f"INFO: Entire H3 section ID '{h3_id_in_panel}' updated and re-parsed with potentially stripped fences."
             )
             return True
+
+        # H4 content update
         h4_section = self.get_h4_by_number(h3_section, h4_id_in_h3)
         if not h4_section:
-            print(f"ERROR: H4 ID '{h4_id_in_h3}' not found.")
+            print(
+                f"ERROR: H4 ID '{h4_id_in_h3}' not found in H3 ID '{h3_id_in_panel}'."
+            )
             return False
-        h4_section.content_markdown = new_markdown_content
+        # H4 content is typically just paragraphs, lists, etc., not a full fenced block.
+        # But stripping could be added here if necessary.
+        h4_section.content_markdown = _strip_outer_markdown_fences(new_markdown_content)
         h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
             h3_section
         )
