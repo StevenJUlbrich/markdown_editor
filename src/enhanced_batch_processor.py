@@ -40,6 +40,24 @@ class EnhancedBatchProcessor:
         )
         return roles
 
+    def process_roles_directory(self, input_folder: Path) -> None:
+        input_folder.mkdir(exist_ok=True)
+        all_files = list(input_folder.glob("*.md"))
+
+        for file_path in all_files:
+            logger.info("[Roles Only] Processing: %s", file_path.name)
+            doc = MarkdownDocument(filepath=str(file_path))
+            if not doc.chapter_model:
+                logger.warning(
+                    "[Roles Only] Skipping: Failed to load document model: %s",
+                    file_path.name,
+                )
+                continue
+
+            for panel in doc.chapter_model.document_elements:
+                if isinstance(panel, PanelPydantic):
+                    self.process_panel_roles(doc, panel)
+
     def process_panel(self, doc: MarkdownDocument, panel: PanelPydantic) -> int:
         section_map = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
         if not section_map:
