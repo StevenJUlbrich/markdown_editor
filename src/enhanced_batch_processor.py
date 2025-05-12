@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import List
 
 from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
 from logging_config import get_logger
@@ -7,6 +8,7 @@ from openai_service import (
     get_enhancement_suggestions_for_panel_h3s,
     get_improved_markdown_for_section,
 )
+from suggest_character_roles import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
 
@@ -15,6 +17,28 @@ class EnhancedBatchProcessor:
     def __init__(self, dry_run: bool = False, max_workers: int = 3):
         self.dry_run = dry_run
         self.max_workers = max_workers
+
+    def process_panel_roles(
+        self, doc: MarkdownDocument, panel: PanelPydantic
+    ) -> List[str]:
+        section_map = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
+        if not section_map:
+            return []
+
+        scene_md = section_map.get("Scene Description", "")
+        teaching_md = section_map.get("Teaching Narrative", "")
+
+        roles = suggest_character_roles_from_context(
+            panel_title=panel.panel_title_text,
+            scene_description_md=scene_md,
+            teaching_narrative_md=teaching_md,
+        )
+        logger.info(
+            "Suggested character roles for panel '%s': %s",
+            panel.panel_title_text,
+            roles,
+        )
+        return roles
 
     def process_panel(self, doc: MarkdownDocument, panel: PanelPydantic) -> int:
         section_map = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
