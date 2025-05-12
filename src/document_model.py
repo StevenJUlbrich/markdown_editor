@@ -1134,7 +1134,7 @@ class MarkdownDocument:
             content_lines = h3_section.initial_content_markdown.strip().splitlines()
             heading_line = f"### {h3_section.heading_text.strip().lower()}"
             if content_lines and content_lines[0].strip().lower() == heading_line:
-                content_lines = content_lines[1:]  # Strip duplicate heading
+                content_lines = content_lines[1:]
             content = "\n".join(content_lines).strip()
             initial_content_doc = Document(content)
             blocks_for_render.extend(
@@ -1153,17 +1153,37 @@ class MarkdownDocument:
         return render_blocks_to_markdown(blocks_for_render, self.renderer)
 
     def _sanitize_markdown(self, heading_text: str, markdown: str) -> str:
+        from mistletoe import Document
+        from mistletoe.block_token import BlockCode, Heading
+        from mistletoe.markdown_renderer import MarkdownRenderer
+
         cleaned = markdown.strip()
         if cleaned.startswith("```markdown") or cleaned.startswith("```"):
             lines = cleaned.splitlines()
             if len(lines) > 2 and lines[0].startswith("```"):
                 cleaned = "\n".join(lines[1:-1]).strip()
 
-        lines = cleaned.splitlines()
-        expected_heading = f"### {heading_text.strip().lower()}"
-        if lines and lines[0].strip().lower() == expected_heading:
-            cleaned = "\n".join(lines[1:]).strip()
-        return cleaned
+        doc = Document(cleaned)
+        stripped_blocks = []
+        lower_heading = heading_text.strip().lower()
+
+        for block in doc.children:
+            if isinstance(block, Heading) and block.level == 3:
+                block_heading = get_heading_text(block).strip().lower()
+                if block_heading == lower_heading:
+                    continue
+            if isinstance(block, BlockCode):
+                # You can choose to unwrap or drop
+                continue
+            stripped_blocks.append(block)
+
+        renderer = MarkdownRenderer()
+        try:
+            doc.children = stripped_blocks
+            final = renderer.render(doc)
+        finally:
+            renderer.close()
+        return final.strip()
 
     # --- Reconstruction and Saving ---
     def reconstruct_and_render_document(self) -> str:
