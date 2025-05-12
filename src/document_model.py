@@ -486,6 +486,29 @@ class MarkdownDocument:
     def _parse_h4_sections_from_h3_blocks(
         self, h3_content_blocks: List[BlockToken]
     ) -> tuple[str, List[H4Pydantic]]:
+        def process_active_h4_block():
+            nonlocal h4_counter_in_h3, active_h4_block_node, current_h4_content_blocks
+            if active_h4_block_node:
+                h4_counter_in_h3 += 1
+                expected_h4_text = get_heading_text(active_h4_block_node)
+                cleaned_h4_content_blocks = [
+                    block
+                    for block in current_h4_content_blocks
+                    if not self._is_paragraph_effectively_empty(block)
+                ]
+                h4_content_md = render_blocks_to_markdown(
+                    cleaned_h4_content_blocks, self.renderer
+                )
+                h4_pydantic_list.append(
+                    H4Pydantic(
+                        heading_text=expected_h4_text,
+                        mistletoe_h4_block=active_h4_block_node,
+                        content_markdown=h4_content_md,
+                        h4_number_in_h3=h4_counter_in_h3,
+                    )
+                )
+                current_h4_content_blocks = []
+
         h4_pydantic_list: List[H4Pydantic] = []
         current_h4_content_blocks: List[BlockToken] = []
         initial_content_for_h3_blocks: List[BlockToken] = []
@@ -496,66 +519,18 @@ class MarkdownDocument:
         if not h3_content_blocks:
             return "", []
 
-        block_idx = 0
-        while block_idx < len(h3_content_blocks):
-            block = h3_content_blocks[block_idx]
-            is_h4_heading = False
-
+        for block in h3_content_blocks:
             if isinstance(block, Heading) and block.level == 4:
-                is_h4_heading = True
-
-            if is_h4_heading:
                 is_before_first_h4 = False
-                if active_h4_block_node:
-                    h4_counter_in_h3 += 1
-
-                    expected_h4_text_for_unwrap = get_heading_text(active_h4_block_node)
-                    cleaned_h4_content_blocks = [
-                        block
-                        for block in current_h4_content_blocks
-                        if not self._is_paragraph_effectively_empty(block)
-                    ]
-                    h4_content_md = render_blocks_to_markdown(
-                        cleaned_h4_content_blocks, self.renderer
-                    )
-                    h4_pydantic_list.append(
-                        H4Pydantic(
-                            heading_text=expected_h4_text_for_unwrap,  # Use the already extracted text
-                            mistletoe_h4_block=active_h4_block_node,
-                            content_markdown=h4_content_md,
-                            h4_number_in_h3=h4_counter_in_h3,
-                        )
-                    )
-
+                process_active_h4_block()
                 active_h4_block_node = block
-                current_h4_content_blocks = []
-                block_idx += 1
             else:
                 if is_before_first_h4:
                     initial_content_for_h3_blocks.append(block)
                 else:
                     current_h4_content_blocks.append(block)
-                block_idx += 1
 
-        if active_h4_block_node:
-            h4_counter_in_h3 += 1
-            expected_h4_text_for_unwrap_last = get_heading_text(active_h4_block_node)
-            cleaned_h4_content_blocks_last = [
-                block
-                for block in current_h4_content_blocks
-                if not self._is_paragraph_effectively_empty(block)
-            ]
-            h4_content_md = render_blocks_to_markdown(
-                cleaned_h4_content_blocks_last, self.renderer
-            )
-            h4_pydantic_list.append(
-                H4Pydantic(
-                    heading_text=expected_h4_text_for_unwrap_last,
-                    mistletoe_h4_block=active_h4_block_node,
-                    content_markdown=h4_content_md,
-                    h4_number_in_h3=h4_counter_in_h3,
-                )
-            )
+        process_active_h4_block()
 
         initial_content_markdown_for_h3 = render_blocks_to_markdown(
             initial_content_for_h3_blocks, self.renderer

@@ -261,7 +261,7 @@ H3 Sub-sections to Evaluate:
 
 For each H3 sub-section evaluated (use its exact title as the key, e.g., "Scene Description", "Common Example of the Problem"), provide your assessment in the following JSON format:
 {{
-  "Exact H3 Title 1": {{ "enhance": "Yes/No", "recommendation": "Type of enhancement (e.g., Add Diagram, More Examples, Checklist, Code Snippet, Table, Analogy) or null if No", "reason": "Brief justification for your recommendation or why no enhancement is needed." }},
+  "Exact H3 Title 1": {{ "enhance": "Yes/No", "recommendation": "Type of enhancement (e.g., Add Mermaid Diagram, Text Diagram, More Examples, Checklist, Code Snippet, Table, Analogy) or null if No", "reason": "Brief justification for your recommendation or why no enhancement is needed." }},
   "Exact H3 Title 2": {{ "enhance": "Yes/No", "recommendation": "...", "reason": "..." }}
 }}
 
@@ -340,26 +340,24 @@ def get_improved_markdown_for_section(
         print(
             f"[OpenAI Service] INFO: Skipping enhancement for empty or whitespace-only original content."
         )
-        return original_h3_markdown_content  # Return original (empty/whitespace)
+        return original_h3_markdown_content
 
-    # Extract H3 title from the original_h3_markdown_content if it starts with "###"
-    h3_title_in_md = "This Section"  # Default if no H3 heading found in the content
+    h3_title_in_md = "This Section"
     lines = original_h3_markdown_content.strip().splitlines()
     if lines and lines[0].strip().startswith("### "):
-        h3_title_in_md = lines[0].strip()  # This will be like "### Scene Description"
-        # For the prompt, we might want just "Scene Description"
-        h3_title_for_prompt = h3_title_in_md[4:].strip()  # Remove "### "
-    else:  # If it doesn't start with H3, use a placeholder or infer
+        h3_title_in_md = lines[0].strip()
+        h3_title_for_prompt = h3_title_in_md[4:].strip()
+    else:
         h3_title_for_prompt = "the provided section"
 
     prompt = f"""You are a senior SRE and technical learning designer.
-You are tasked with improving a specific H3 sub-section from a larger document panel titled "{panel_title_context}".
+You are tasked with improving a specific H3 sub-section from a larger document panel titled \"{panel_title_context}\".
 The overall context for the panel is:
 ---
 {overall_panel_context_md}
 ---
 
-The H3 sub-section to improve is titled: "{h3_title_for_prompt}"
+The H3 sub-section to improve is titled: \"{h3_title_for_prompt}\"
 
 It was previously identified that this section should be enhanced.
 Suggested Enhancement Type: {enhancement_type or "General improvement"}
@@ -374,10 +372,11 @@ Please provide an improved version of this H3 sub-section.
 - Incorporate the suggested enhancement.
 - Preserve the original tone and technical accuracy.
 - Ensure the output is well-formatted Markdown.
-- Return *only* the complete, improved Markdown for this H3 sub-section, *including its H3 heading* (e.g., "### {h3_title_for_prompt}\n...new content..."). 
-- Do not add any explanatory text, apologies, or conversational filler before or after the Markdown.
+- Return only the improved Markdown content for this section.
+- Do **not** include image references, links to diagrams, or Markdown image tags (e.g., `![label](url)`).
+- If a visual aid is required, use **Mermaid diagrams**, **ASCII flowcharts**, or **text-based representations**.
+- Do not include explanations or any content outside of the Markdown.
 """
-    # print(f"\nDEBUG [OpenAI Service] Enhancement Prompt for H3 '{h3_title_for_prompt}':\n{prompt[:1000]}...\n")
 
     print(
         f"\n[OpenAI Service] Requesting enhancement for H3 section: '{h3_title_for_prompt}' in panel '{panel_title_context}'"
@@ -386,20 +385,14 @@ Please provide an improved version of this H3 sub-section.
         response = client.chat.completions.create(
             model=MODEL_FOR_ENHANCEMENT,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,  # Higher temperature for more creative rewriting
+            temperature=0.7,
         )
         improved_markdown = response.choices[0].message.content
         if improved_markdown:
-            # Ensure the response starts with the H3 heading if the API sometimes forgets
-
-            # cleaned_improved_markdown = improved_markdown.strip()
             cleaned_improved_markdown = strip_markdown_fences(improved_markdown).strip()
 
             expected_heading = f"### {h3_title_for_prompt}"
-            if not cleaned_improved_markdown.startswith(
-                "### "
-            ):  # If API omits H3 heading
-                # Try to find if original_h3_markdown_content started with one to reconstruct
+            if not cleaned_improved_markdown.startswith("### "):
                 if original_h3_markdown_content.strip().startswith("### "):
                     original_heading_line = (
                         original_h3_markdown_content.strip().splitlines()[0]
@@ -413,9 +406,6 @@ Please provide an improved version of this H3 sub-section.
                         cleaned_improved_markdown = (
                             original_heading_line + "\n\n" + cleaned_improved_markdown
                         )
-                # else if no original heading, and API didn't provide one, this might be an issue.
-                # For now, we assume the API is instructed to return it.
-
             return cleaned_improved_markdown
         else:
             print(
