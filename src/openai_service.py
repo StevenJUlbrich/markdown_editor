@@ -358,9 +358,7 @@ def get_improved_markdown_for_section(
 ) -> Optional[str]:
 
     if not original_h3_markdown_content or not original_h3_markdown_content.strip():
-        print(
-            f"[OpenAI Service] INFO: Skipping enhancement for empty or whitespace-only original content."
-        )
+        logger.info("[OpenAI Service] Skipping enhancement for empty content.")
         return original_h3_markdown_content
 
     h3_title_in_md = "This Section"
@@ -399,8 +397,10 @@ Please provide an improved version of this H3 sub-section.
 - Do not include explanations or any content outside of the Markdown.
 """
 
-    print(
-        f"\n[OpenAI Service] Requesting enhancement for H3 section: '{h3_title_for_prompt}' in panel '{panel_title_context}'"
+    logger.info(
+        "Requesting enhancement for H3 section: '%s' in panel '%s'",
+        h3_title_for_prompt,
+        panel_title_context,
     )
     try:
         response = client.chat.completions.create(
@@ -410,7 +410,9 @@ Please provide an improved version of this H3 sub-section.
         )
         improved_markdown = response.choices[0].message.content
         if improved_markdown:
-            cleaned_improved_markdown = strip_markdown_fences(improved_markdown).strip()
+            cleaned_improved_markdown = handle_openai_response(
+                strip_markdown_fences(improved_markdown), h3_title_for_prompt
+            )
 
             expected_heading = f"### {h3_title_for_prompt}"
             if not cleaned_improved_markdown.startswith("### "):
@@ -421,22 +423,19 @@ Please provide an improved version of this H3 sub-section.
                     if not cleaned_improved_markdown.strip().startswith(
                         original_heading_line.strip()
                     ):
-                        print(
-                            f"[OpenAI Service] INFO: Prepending original H3 heading '{original_heading_line.strip()}' to API response."
+                        logger.info(
+                            "Prepending original H3 heading '%s' to API response.",
+                            original_heading_line.strip(),
                         )
                         cleaned_improved_markdown = (
                             original_heading_line + "\n\n" + cleaned_improved_markdown
                         )
             return cleaned_improved_markdown
         else:
-            print(
-                "[OpenAI Service] ERROR: Received empty response for content enhancement."
-            )
+            logger.error("Received empty response for content enhancement.")
             return None
     except Exception as e:
-        print(
-            f"[OpenAI Service] ERROR: Unexpected error during content enhancement: {type(e).__name__} - {e}"
-        )
+        logger.exception("Unexpected error during content enhancement: %s", str(e))
         return None
 
 
