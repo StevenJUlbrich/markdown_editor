@@ -1152,10 +1152,11 @@ class MarkdownDocument:
 
         return render_blocks_to_markdown(blocks_for_render, self.renderer)
 
+    # document_model.py
     def _sanitize_markdown(self, heading_text: str, markdown: str) -> str:
-        from mistletoe import Document
-        from mistletoe.block_token import BlockCode, Heading
-        from mistletoe.markdown_renderer import MarkdownRenderer
+        # Imports like `from mistletoe import Document` are typically at the module level.
+        # If `BlockCode` and `Heading` are only used here, their import can stay,
+        # but `MarkdownRenderer` import is not needed if using `self.renderer`.
 
         cleaned = markdown.strip()
         if cleaned.startswith("```markdown") or cleaned.startswith("```"):
@@ -1163,29 +1164,30 @@ class MarkdownDocument:
             if len(lines) > 2 and lines[0].startswith("```"):
                 cleaned = "\n".join(lines[1:-1]).strip()
 
+        # It's good practice to ensure Document is imported if not already at module top
+        # from mistletoe import Document (if not already globally available)
+        # from mistletoe.block_token import BlockCode, Heading (if not already globally)
+
         original_doc = Document(cleaned)
         lower_heading = heading_text.strip().lower()
 
-        # Reconstruct a valid list of children
         filtered_blocks = []
         for block in original_doc.children:
             if isinstance(block, Heading) and block.level == 3:
                 block_heading = get_heading_text(block).strip().lower()
                 if block_heading == lower_heading:
                     continue
-            if isinstance(block, BlockCode):
-                continue  # Drop triple backtick content entirely
+            if isinstance(block, BlockCode):  # Make sure BlockCode is imported
+                continue
             filtered_blocks.append(block)
 
-        # Build new document for rendering
-        new_doc = Document("")  # dummy init to satisfy constructor
+        new_doc = Document("")
         new_doc.children = filtered_blocks
 
-        renderer = MarkdownRenderer()
-        try:
-            rendered = renderer.render(new_doc)
-        finally:
-            renderer.close()
+        # Use the class's shared renderer instance instead of creating a new one.
+        # No try/finally/close needed for the shared renderer here,
+        # as its lifecycle isn't tied to this specific call.
+        rendered = self.renderer.render(new_doc)
 
         return rendered.strip()
 
