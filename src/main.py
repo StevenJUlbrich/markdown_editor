@@ -5,9 +5,12 @@ from logging_config import setup_logging
 
 setup_logging()
 
+from pathlib import Path
+
 from app_controller import (
     AppController,
 )  # Assuming app_controller.py is in the same directory
+from enhanced_batch_processor import EnhancedBatchProcessor
 
 
 def display_numbered_list(
@@ -119,6 +122,7 @@ def main_cli():
         "10": "Export Document Structure to JSON",
         "11": "Enhance Named Sections in Selected Panel (Targeted API Call)",  # New Option
         "12": "Save Document",  # Renumbered from 11
+        "13": "Batch Process Directory",
         "0": "Exit",
     }
     # Determine the highest valid numeric choice for the main menu
@@ -671,6 +675,38 @@ def main_cli():
                     pass
             else:
                 print("  Save cancelled: No output filepath provided.")
+
+        elif choice == "13":  # Batch Process Directory
+            print("\n--- Batch Enhance All Markdown Files in a Folder ---")
+            src_dir = input(
+                "Enter source directory path (folder with .md files): "
+            ).strip()
+            out_dir = input(
+                "Enter target directory path (to save enhanced files): "
+            ).strip()
+
+            if not src_dir or not out_dir:
+                print("  Operation cancelled: missing directory path.")
+                continue
+
+            dry_run_input = (
+                input("Dry run mode? (yes/no, default: no): ").strip().lower()
+            )
+            dry_run = dry_run_input == "yes"
+
+            src_path = Path(src_dir)
+            out_path = Path(out_dir)
+
+            if not src_path.exists() or not src_path.is_dir():
+                print(
+                    f"  Source directory '{src_path}' does not exist or is not a folder."
+                )
+                continue
+
+            processor = EnhancedBatchProcessor(dry_run=dry_run)
+            processor.process_directory(src_path, out_path)
+
+            print("  Batch enhancement complete.")
 
         elif choice == "0":
             print("Exiting Markdown Processor.")
