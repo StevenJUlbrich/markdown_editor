@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Dict, List
 
 from openai_service import client
@@ -47,7 +48,12 @@ Return only a JSON array like this:
     )
 
     raw = response.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE)
+
     try:
+        parsed = json.loads(raw)
+
         parsed = json.loads(raw)
         if isinstance(parsed, list):
             return parsed

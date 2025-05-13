@@ -1,13 +1,22 @@
 import json
+import re
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Union
 
 from document_model import MarkdownDocument, PanelPydantic
 from logging_config import get_logger
 from suggest_character_roles import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
+
+
+def clean_json_list_from_fenced_response(raw: Union[str, List[str]]) -> str:
+    if isinstance(raw, list):
+        return json.dumps(raw)  # already parsed list
+    if not isinstance(raw, str):
+        raise TypeError(f"Expected str or list[str], got {type(raw).__name__}")
+    return re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE)
 
 
 def extract_roles_per_panel(doc: MarkdownDocument) -> Dict[str, List[str]]:
@@ -24,12 +33,18 @@ def extract_roles_per_panel(doc: MarkdownDocument) -> Dict[str, List[str]]:
             scene = section_map.get("Scene Description", "")
             teaching = section_map.get("Teaching Narrative", "")
             if scene.strip() or teaching.strip():
-                roles = suggest_character_roles_from_context(
+                parsed_roles = suggest_character_roles_from_context(
                     panel_title=element.panel_title_text,
                     scene_description_md=scene,
                     teaching_narrative_md=teaching,
                 )
-                results[element.panel_title_text] = roles
+                if isinstance(parsed_roles, list):
+                    results[element.panel_title_text] = parsed_roles
+                else:
+                    logger.warning(
+                        "Parsed roles were not a list for panel '%s'.",
+                        element.panel_title_text,
+                    )
     return results
 
 

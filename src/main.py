@@ -124,6 +124,7 @@ def main_cli():
         "12": "Save Document",  # Renumbered from 11
         "13": "Batch Process Directory",
         "14": "Suggest Character Roles Only (Panels in Folder)",
+        "15": "Validate Role Coverage in Markdown Files",
         "0": "Exit",
     }
     # Determine the highest valid numeric choice for the main menu
@@ -730,6 +731,38 @@ def main_cli():
         elif choice == "0":
             print("Exiting Markdown Processor.")
             break
+
+        # Add to your CLI's menu dictionary:
+        # "15": "Validate Role Coverage in Markdown Files"
+
+        elif choice == "15":
+            print("\n--- Validate Role Coverage ---")
+            char_json_path = input("Enter path to character JSON: ").strip()
+            md_dir_path = input("Enter path to markdown directory: ").strip()
+
+            if not char_json_path or not md_dir_path:
+                print("  Operation cancelled: missing required path(s).")
+                continue
+
+            char_path = Path(char_json_path)
+            md_path = Path(md_dir_path)
+
+            if not char_path.exists():
+                print(f"  Character file not found: {char_path}")
+                continue
+            if not md_path.exists() or not md_path.is_dir():
+                print(f"  Markdown directory not valid: {md_path}")
+                continue
+
+            from role_validator_tool import validate_roles
+
+            results = validate_roles(char_path, md_path)
+            print("\n--- Missing Role Summary ---")
+            for entry in results:
+                print(
+                    f"- {entry['file']} | Panel: {entry['panel']} | Missing: {entry['missing_roles']}"
+                )
+            print(f"\nChecked {len(results)} panel(s) with missing roles.")
 
         else:
             print(
