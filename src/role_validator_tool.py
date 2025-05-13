@@ -3,7 +3,10 @@ from pathlib import Path
 from typing import Dict, List
 
 from document_model import MarkdownDocument, PanelPydantic
+from logging_config import get_logger
 from suggest_character_roles import suggest_character_roles_from_context
+
+logger = get_logger(__name__)
 
 
 def extract_roles_per_panel(doc: MarkdownDocument) -> Dict[str, List[str]]:
@@ -41,21 +44,37 @@ def get_valid_roles_from_character_json(json_path: Path) -> List[str]:
         )
 
 
-def validate_roles(character_json: Path, markdown_dir: Path):
+def validate_roles(
+    character_json: Path, markdown_dir: Path
+) -> List[Dict[str, List[str]]]:
     valid_roles = set(get_valid_roles_from_character_json(character_json))
-    print(f"Loaded {len(valid_roles)} defined roles from character config.")
+    logger.info("Loaded %d defined roles from character config.", len(valid_roles))
 
+    validation_report = []
     for md_file in markdown_dir.glob("*.md"):
         doc = MarkdownDocument(filepath=str(md_file))
-        print(f"\n📘 Checking {md_file.name}...")
+        logger.info("Checking file: %s", md_file.name)
         panel_roles = extract_roles_per_panel(doc)
         for panel_title, roles in panel_roles.items():
             missing = [r for r in roles if r not in valid_roles]
             if missing:
-                print(f"  ❌ Panel '{panel_title}' has undefined roles: {missing}")
+                logger.warning(
+                    "❌ Panel '%s' in '%s' has undefined roles: %s",
+                    panel_title,
+                    md_file.name,
+                    missing,
+                )
+                validation_report.append(
+                    {
+                        "file": md_file.name,
+                        "panel": panel_title,
+                        "missing_roles": missing,
+                    }
+                )
             else:
-                print(f"  ✅ Panel '{panel_title}' roles are all mapped.")
-
-
-# Example usage (modify paths as needed):
-# validate_roles(Path("merged_character_sheet.json"), Path("./chapters/topic1"))
+                logger.info(
+                    "✅ Panel '%s' roles in '%s' are all mapped.",
+                    panel_title,
+                    md_file.name,
+                )
+    return validation_report
