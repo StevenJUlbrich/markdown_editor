@@ -1,4 +1,5 @@
 import json
+import sys
 from pathlib import Path
 from typing import Dict, List
 
@@ -78,3 +79,29 @@ def validate_roles(
                     md_file.name,
                 )
     return validation_report
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print(
+            "Usage: python role_validator_tool.py <character_json> <markdown_directory>"
+        )
+        sys.exit(1)
+
+    character_json = Path(sys.argv[1])
+    markdown_directory = Path(sys.argv[2])
+
+    if not character_json.exists():
+        print(f"Character JSON not found: {character_json}")
+        sys.exit(1)
+    if not markdown_directory.exists() or not markdown_directory.is_dir():
+        print(f"Markdown directory not found or invalid: {markdown_directory}")
+        sys.exit(1)
+
+    report = validate_roles(character_json, markdown_directory)
+    print("\n=== MISSING ROLE SUMMARY ===")
+    for entry in report:
+        print(
+            f"- {entry['file']} | Panel: {entry['panel']} | Missing: {entry['missing_roles']}"
+        )
+    print(f"\n✅ Completed: {len(report)} panel(s) with missing roles found.")
