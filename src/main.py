@@ -123,6 +123,7 @@ def main_cli():
         "11": "Enhance Named Sections in Selected Panel (Targeted API Call)",  # New Option
         "12": "Save Document",  # Renumbered from 11
         "13": "Batch Process Directory",
+        "14": "Suggest Character Roles Only (Panels in Folder)",
         "0": "Exit",
     }
     # Determine the highest valid numeric choice for the main menu
@@ -707,6 +708,24 @@ def main_cli():
             processor.process_directory(src_path, out_path)
 
             print("  Batch enhancement complete.")
+
+        elif choice == "14":
+            print("\n--- Role Suggestion for Panels in Markdown Files ---")
+            src_dir = input("Enter source directory path with markdown files: ").strip()
+            if not src_dir:
+                print("  Operation cancelled: no directory path provided.")
+                continue
+
+            src_path = Path(src_dir)
+            if not src_path.exists() or not src_path.is_dir():
+                print(
+                    f"  Source directory '{src_path}' does not exist or is not a folder."
+                )
+                continue
+
+            processor = EnhancedBatchProcessor(dry_run=True)
+            processor.process_roles_directory(src_path)
+            print("  Role suggestion scan complete.")
 
         elif choice == "0":
             print("Exiting Markdown Processor.")
