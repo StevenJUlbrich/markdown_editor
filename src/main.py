@@ -9,9 +9,11 @@ setup_logging()
 
 from pathlib import Path
 
-from app_controller import (
-    AppController,
-)  # Assuming app_controller.py is in the same directory
+from app_controller import AppController
+
+# Updated imports for refactored batch processors
+from base_batch_processor import BaseBatchProcessor
+from batch_processor import BatchProcessor
 from enhanced_batch_processor import EnhancedBatchProcessor
 
 
@@ -685,6 +687,14 @@ def main_cli():
 
         elif choice == "13":  # Batch Process Directory
             print("\n--- Batch Enhance All Markdown Files in a Folder ---")
+            print("This feature processes multiple markdown files for enhancement.")
+            print("There are two processing modes available:")
+            print("1. Sequential processing - processes files one at a time")
+            print(
+                "2. Multi-threaded processing - processes multiple files simultaneously"
+            )
+            print("   (faster but uses more system resources)")
+
             src_dir = input(
                 "Enter source directory path (folder with .md files): "
             ).strip()
@@ -701,6 +711,11 @@ def main_cli():
             )
             dry_run = dry_run_input == "yes"
 
+            threading_input = (
+                input("Use multi-threading? (yes/no, default: yes): ").strip().lower()
+            )
+            use_threading = threading_input != "no"  # Default to yes
+
             src_path = Path(src_dir)
             out_path = Path(out_dir)
 
@@ -710,9 +725,21 @@ def main_cli():
                 )
                 continue
 
-            processor = EnhancedBatchProcessor(dry_run=dry_run)
-            processor.process_directory(src_path, out_path)
+            # Choose the appropriate processor based on threading preference
+            if use_threading:
+                threads = input("Number of worker threads (default: 3): ").strip()
+                max_workers = int(threads) if threads.isdigit() else 3
+                processor = EnhancedBatchProcessor(
+                    dry_run=dry_run, max_workers=max_workers
+                )
+                print(
+                    f"  Using EnhancedBatchProcessor with {max_workers} worker threads"
+                )
+            else:
+                processor = BatchProcessor(dry_run=dry_run)
+                print("  Using sequential BatchProcessor (no threading)")
 
+            processor.process_directory(src_path, out_path)
             print("  Batch enhancement complete.")
 
         elif choice == "14":
@@ -729,6 +756,7 @@ def main_cli():
                 )
                 continue
 
+            # We'll use the EnhancedBatchProcessor for role processing as it has the dedicated method
             processor = EnhancedBatchProcessor(dry_run=True)
             processor.process_roles_directory(src_path)
             print("  Role suggestion scan complete.")
