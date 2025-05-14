@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 from typing import Dict, List
 
@@ -8,52 +9,74 @@ client = OpenAI()
 
 EXAMPLE_CHARACTER = {
     "visual_tags": [
-        "female",
-        "42 years old",
-        "tall",
-        "piercing eyes",
-        "short curly hair",
-        "dark brown eyes",
-        "business formal attire",
-        "pinstripe blazer",
-        "silver badge lanyard",
+        "non-binary",
+        "35 years old",
+        "medium height",
+        "glasses",
+        "buzzed hair",
+        "hazel eyes",
+        "casual hoodie",
+        "slacks",
+        "cyberpunk pin",
     ],
     "required_constraints": [
-        "Always takes charge during incidents",
-        "Never accepts vague status updates",
+        "Always brings up ethics",
+        "Frequently references compliance metrics",
     ],
-    "motion_rules": "Moves decisively, frequently points while speaking, maintains confident posture.",
-    "voice_tone": "Assertive, mid-range, speaks with clarity and urgency under stress.",
+    "motion_rules": "Fidgets with objects during meetings; leans forward when engaged.",
+    "voice_tone": "Low and calm, but firm; uses analogies when teaching.",
     "prop_loadout": [
-        "incident response tablet",
-        "audit log binder",
-        "emergency contact headset",
+        "encrypted USB",
+        "annotated doc binder",
+        "emergency caffeine pack",
     ],
-    "appearance": "A composed leader with a reputation for clarity and action in crises.",
-    "role": "Executive Stakeholder",
-    "catchphrase": "If it's not in the log, it didn't happen.",
+    "appearance": "An analytical mind with a renegade visual edge.",
+    "role": "Risk Analyst",
+    "catchphrase": "You can't monitor what you don't model.",
 }
 
 
 def generate_prompt(
-    missing_roles: List[str], existing_names: List[str], characters_per_role: int = 2
+    missing_roles: List[str], existing_names: List[str], per_role: int = 2
 ) -> str:
     return f"""
-You are an expert character designer for an educational graphic novel about SRE (site reliability engineering) in banking.
+You are a professional character writer for a graphic novel about banking system reliability.
 
-We are missing characters for the following roles:
-{', '.join(missing_roles)}
+Generate {per_role} unique characters for each of the following roles:
+{", ".join(missing_roles)}
 
-For each role, generate {characters_per_role} unique characters in this JSON structure. Do not duplicate names from this list:
-{', '.join(existing_names)}
+Avoid any names from this list:
+{", ".join(existing_names)}
 
-Return only a JSON object under "characters" where keys are character names.
+Each character must match this JSON format:
+{json.dumps({"Example Character": EXAMPLE_CHARACTER}, indent=2)}
 
-Use this format for each character:
-{json.dumps({"Example Name": EXAMPLE_CHARACTER}, indent=2)}
+Return only the final JSON object like:
+{{ "New Name 1": {{...}}, "New Name 2": {{...}}, ... }}
 
-Return a valid JSON object. Do not include explanatory text.
+Do not include commentary or explanation.
 """
+
+
+def parse_response_with_retry(
+    content: str, retries: int = 3, delay: float = 1.0
+) -> Dict:
+    for attempt in range(retries):
+        try:
+            if content.startswith("```json"):
+                content = content[7:].strip()
+            elif content.startswith("```"):
+                content = content[3:].strip()
+            if content.endswith("```"):
+                content = content[:-3].strip()
+            parsed = json.loads(content)
+            return parsed
+        except json.JSONDecodeError as e:
+            print(f"⚠️ JSON parse error (attempt {attempt+1}): {e}")
+            if attempt < retries - 1:
+                time.sleep(delay)
+                print("Retrying...\n")
+    raise ValueError("❌ Failed to parse OpenAI response after retries.")
 
 
 def generate_character_profiles_for_roles(
@@ -65,43 +88,49 @@ def generate_character_profiles_for_roles(
     with open(input_json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    existing_characters = data.get("characters", {})
-    existing_names = list(existing_characters.keys())
+    existing_chars = data.get("characters", {})
+    existing_names = list(existing_chars.keys())
 
     prompt = generate_prompt(missing_roles, existing_names, characters_per_role)
 
-    print("Calling OpenAI to generate new character profiles...")
+    print("📡 Requesting new characters from OpenAI...")
     response = client.chat.completions.create(
         model="gpt-4o-2024-11-20",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
+        temperature=0.6,
     )
 
-    content = response.choices[0].message.content.strip()
-    if content.startswith("```json"):
-        content = content[7:].strip()
-    elif content.startswith("```"):
-        content = content[3:].strip()
-    if content.endswith("```"):
-        content = content[:-3].strip()
-
+    raw = response.choices[0].message.content.strip()
     try:
-        parsed = json.loads(content)
-        new_chars = parsed.get("characters", {})
-        deduped = {
-            name: profile
-            for name, profile in new_chars.items()
-            if name not in existing_names
-        }
+        parsed = parse_response_with_retry(raw)
+        new_entries = parsed.get(
+            "characters", parsed
+        )  # fallback if root is already dict
 
-        print(f"✅ Adding {len(deduped)} new characters to file.")
-        existing_characters.update(deduped)
+        added = 0
+        per_role_counts = {r: 0 for r in missing_roles}
+        for name, profile in new_entries.items():
+            role = profile.get("role")
+            if name not in existing_names and role in per_role_counts:
+                existing_chars[name] = profile
+                added += 1
+                per_role_counts[role] += 1
 
-        data["characters"] = existing_characters
+        print(f"\n✅ Added {added} new characters to the file.\n")
+        for role, count in per_role_counts.items():
+            if count == characters_per_role:
+                print(f"✔️ {count} characters created for role: {role}")
+            else:
+                print(
+                    f"❗ Only {count} created for role: {role} (expected {characters_per_role})"
+                )
+
+        data["characters"] = existing_chars
         with open(output_json_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-        print(f"✅ Updated file written to: {output_json_path}")
+        print(f"\n💾 Saved updated character file to: {output_json_path}")
+
     except Exception as e:
-        print("❌ Failed to parse OpenAI JSON:", e)
-        print("Raw output:")
-        print(content)
+        print("❌ Character generation failed.")
+        print("Error:", e)
+        print("\nRaw OpenAI output:\n", raw)

@@ -1,6 +1,8 @@
 # main.py
+from itertools import chain
 from typing import Any, Dict, List, Optional
 
+from generate_character_profiles import generate_character_profiles_for_roles
 from logging_config import setup_logging
 
 setup_logging()
@@ -125,6 +127,8 @@ def main_cli():
         "13": "Batch Process Directory",
         "14": "Suggest Character Roles Only (Panels in Folder)",
         "15": "Validate Role Coverage in Markdown Files",
+        "16": "Generate Characters for Missing Roles and Patch JSON",
+        "17": "Scan Markdown Folder and Patch Character JSON with Missing Roles",
         "0": "Exit",
     }
     # Determine the highest valid numeric choice for the main menu
@@ -763,6 +767,110 @@ def main_cli():
                     f"- {entry['file']} | Panel: {entry['panel']} | Missing: {entry['missing_roles']}"
                 )
             print(f"\nChecked {len(results)} panel(s) with missing roles.")
+        elif choice == "16":
+            print("\n--- Character Generation for Missing Roles ---")
+            char_json_path = input("Enter path to character JSON: ").strip()
+            roles_str = input("Enter missing roles (comma-separated): ").strip()
+            per_role_input = input(
+                "How many characters per role? (default: 2): "
+            ).strip()
+
+            if not char_json_path or not roles_str:
+                print("  Operation cancelled: missing required input.")
+                continue
+
+            char_path = Path(char_json_path)
+            if not char_path.exists():
+                print(f"  Character JSON file not found: {char_path}")
+                continue
+
+            try:
+                missing_roles = [r.strip() for r in roles_str.split(",") if r.strip()]
+                per_role = (
+                    int(per_role_input) if per_role_input.strip().isdigit() else 2
+                )
+
+                if per_role < 1 or per_role > 5:
+                    print(
+                        "  Please enter a number between 1 and 5 for characters per role."
+                    )
+                    continue
+
+                output_path = char_path  # or prompt for new file if needed
+                generate_character_profiles_for_roles(
+                    missing_roles,
+                    input_json_path=char_path,
+                    output_json_path=output_path,
+                    characters_per_role=per_role,
+                )
+            except Exception as e:
+                print("❌ Error during character generation:", e)
+        elif choice == "17":
+            print("\n--- Scan Markdown and Auto-Patch Character JSON ---")
+            char_json_path = input("Enter path to character JSON: ").strip()
+            md_dir_path = input("Enter markdown directory path: ").strip()
+            per_role_input = input(
+                "How many characters per role? (default: 2): "
+            ).strip()
+
+            if not char_json_path or not md_dir_path:
+                print("  Operation cancelled: missing required path(s).")
+                continue
+
+            char_path = Path(char_json_path)
+            md_path = Path(md_dir_path)
+            if not char_path.exists():
+                print(f"  Character JSON not found: {char_path}")
+                continue
+            if not md_path.exists() or not md_path.is_dir():
+                print(f"  Markdown directory invalid: {md_path}")
+                continue
+
+            try:
+                from generate_character_profiles import (
+                    generate_character_profiles_for_roles,
+                )
+                from role_validator_tool import validate_roles
+
+                report = validate_roles(char_path, md_path)
+
+                # Collect unique roles from report
+                # Flatten all missing role lists into one set
+                raw_missing_roles = [
+                    entry["missing_roles"]
+                    for entry in report
+                    if entry.get("missing_roles")
+                ]
+                missing_roles_set = set(chain.from_iterable(raw_missing_roles))
+
+                if not missing_roles_set:
+                    print("✅ All roles are already covered. No characters needed.")
+                    continue
+
+                print(
+                    f"📝 Missing Roles Detected: {', '.join(sorted(missing_roles_set))}"
+                )
+
+                confirm = (
+                    input("Proceed to generate characters for these roles? (yes/no): ")
+                    .strip()
+                    .lower()
+                )
+                if confirm != "yes":
+                    print("  Operation cancelled.")
+                    continue
+
+                per_role = (
+                    int(per_role_input) if per_role_input.strip().isdigit() else 2
+                )
+                generate_character_profiles_for_roles(
+                    list(missing_roles_set),
+                    input_json_path=char_path,
+                    output_json_path=char_path,
+                    characters_per_role=per_role,
+                )
+            except Exception as e:
+                print(f"❌ Error: {e}")
 
         else:
             print(
