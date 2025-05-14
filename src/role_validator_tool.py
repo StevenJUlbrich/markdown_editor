@@ -1,26 +1,66 @@
+"""
+Improved role validator tool that properly handles nested list types
+"""
+
 import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Set, Union
 
-from comic_image_pipeline import suggest_character_roles_from_context
 from document_model import MarkdownDocument, PanelPydantic
 from logging_config import get_logger
+from openai_service import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
 
 
-def clean_json_list_from_fenced_response(raw: Union[str, List[str]]) -> str:
-    if isinstance(raw, list):
-        return json.dumps(raw)  # already parsed list
-    if not isinstance(raw, str):
-        raise TypeError(f"Expected str or list[str], got {type(raw).__name__}")
-    return re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE)
+def flatten_roles(roles: Union[List[Any], Any]) -> List[str]:
+    """
+    Recursively flattens a potentially nested list structure of roles into a single list of strings.
+
+    Args:
+        roles: A list (potentially nested) or single item that contains roles
+
+    Returns:
+        A flat list of string roles with no nesting
+    """
+    flattened = []
+
+    # Handle the case when roles is not a list
+    if not isinstance(roles, list):
+        if isinstance(roles, str):
+            return [roles]
+        logger.warning(
+            f"Non-list, non-string role found: {roles} (type: {type(roles).__name__})"
+        )
+        return []
+
+    # Process the list recursively
+    for item in roles:
+        if isinstance(item, str):
+            flattened.append(item)
+        elif isinstance(item, list):
+            # Recursively flatten nested lists
+            flattened.extend(flatten_roles(item))
+        else:
+            logger.warning(
+                f"Unexpected role type in list: {item} (type: {type(item).__name__})"
+            )
+
+    return flattened
 
 
 def extract_roles_per_panel(doc: MarkdownDocument) -> Dict[str, List[str]]:
-    """Returns a map of panel title → suggested roles."""
+    """
+    Returns a map of panel title → suggested roles, ensuring all roles are properly flattened.
+
+    Args:
+        doc: The document model to extract roles from
+
+    Returns:
+        Dictionary mapping panel titles to lists of role strings
+    """
     results = {}
     if not doc.chapter_model:
         return results
@@ -32,37 +72,83 @@ def extract_roles_per_panel(doc: MarkdownDocument) -> Dict[str, List[str]]:
             )
             scene = section_map.get("Scene Description", "")
             teaching = section_map.get("Teaching Narrative", "")
+
             if scene.strip() or teaching.strip():
+                # Get roles from OpenAI service
                 parsed_roles = suggest_character_roles_from_context(
                     panel_title=element.panel_title_text,
                     scene_description_md=scene,
                     teaching_narrative_md=teaching,
                 )
-                if isinstance(parsed_roles, list):
-                    results[element.panel_title_text] = parsed_roles
+
+                # Ensure roles are flattened to a simple list of strings
+                flattened_roles = flatten_roles(parsed_roles)
+
+                if flattened_roles:
+                    results[element.panel_title_text] = flattened_roles
+                    logger.info(
+                        "Panel '%s': Found %d role(s): %s",
+                        element.panel_title_text,
+                        len(flattened_roles),
+                        flattened_roles,
+                    )
                 else:
                     logger.warning(
-                        "Parsed roles were not a list for panel '%s'.",
+                        "No valid roles found for panel '%s' after flattening.",
                         element.panel_title_text,
                     )
+
     return results
 
 
 def get_valid_roles_from_character_json(json_path: Path) -> List[str]:
+    """
+    Extract all unique role strings from the character JSON file.
+
+    Args:
+        json_path: Path to the character JSON file
+
+    Returns:
+        List of unique role strings
+    """
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-        return list(
-            {
-                char["role"]
-                for char in data.get("characters", {}).values()
-                if "role" in char
-            }
-        )
+        roles = []
+
+        # Extract roles from characters
+        for char in data.get("characters", {}).values():
+            if "role" in char:
+                role_value = char["role"]
+
+                # Handle potential nested list structures in roles
+                if isinstance(role_value, str):
+                    roles.append(role_value)
+                elif isinstance(role_value, list):
+                    roles.extend(flatten_roles(role_value))
+                else:
+                    logger.warning(
+                        f"Unexpected role type in character JSON: {role_value} "
+                        f"(type: {type(role_value).__name__})"
+                    )
+
+        # Return unique role strings
+        return list(set(roles))
 
 
 def validate_roles(
     character_json: Path, markdown_dir: Path
-) -> List[Dict[str, List[str]]]:
+) -> List[Dict[str, Union[str, List[str]]]]:
+    """
+    Validates that all character roles found in markdown files exist in the character JSON.
+
+    Args:
+        character_json: Path to the character JSON file
+        markdown_dir: Path to the directory containing markdown files
+
+    Returns:
+        List of dictionaries with information about missing roles
+    """
+    # Get all valid roles from the character JSON
     valid_roles = set(get_valid_roles_from_character_json(character_json))
     logger.info("Loaded %d defined roles from character config.", len(valid_roles))
 
@@ -70,9 +156,15 @@ def validate_roles(
     for md_file in markdown_dir.glob("*.md"):
         doc = MarkdownDocument(filepath=str(md_file))
         logger.info("Checking file: %s", md_file.name)
+
+        # Get roles for each panel
         panel_roles = extract_roles_per_panel(doc)
+
         for panel_title, roles in panel_roles.items():
-            missing = [r for r in roles if r not in valid_roles]
+            # Check if roles are missing - ensure we're working with flattened strings
+            flattened_roles = flatten_roles(roles)
+            missing = [r for r in flattened_roles if r not in valid_roles]
+
             if missing:
                 logger.warning(
                     "❌ Panel '%s' in '%s' has undefined roles: %s",
@@ -93,6 +185,7 @@ def validate_roles(
                     panel_title,
                     md_file.name,
                 )
+
     return validation_report
 
 
