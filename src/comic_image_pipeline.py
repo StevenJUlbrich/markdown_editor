@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Dict
 
 from document_model import MarkdownDocument
 from generate_character_profiles import generate_character_profiles_for_roles
@@ -120,3 +121,60 @@ def process_chapter_for_visual_panels(
     # Step 10: Save updated markdown
     doc.save_document(str(output_md_path))
     logger.info("✅ Chapter processed and saved: %s", output_md_path)
+
+
+def generate_image_prompt_from_panel(panel_json: Dict, character_data: Dict) -> str:
+    """
+    Constructs a detailed image generation prompt for a comic panel,
+    including scene summary and visual descriptions of each character.
+
+    Args:
+        panel_json: One panel entry from chapter_images.json
+        character_data: Full character JSON dictionary
+
+    Returns:
+        A complete prompt string suitable for image generation
+    """
+    summary = panel_json.get("summary", "").strip()
+    if not summary:
+        return "Scene summary missing."
+
+    # Ensure minimum length
+    if len(summary) < 350:
+        summary = f"This scene should be more detailed: {summary}"
+    elif len(summary) > 750:
+        summary = summary[:745] + "..."
+
+    characters = panel_json.get("characters_in_frame", [])
+    character_descriptions = []
+
+    for name in characters:
+        profile = character_data.get("characters", {}).get(name, {})
+        if not profile:
+            continue
+        role = profile.get("role", "Unknown role")
+        visual_tags = profile.get("visual_tags", [])
+        tag_desc = ", ".join(visual_tags)
+        character_descriptions.append(f"- {name}: {role}. Visual tags: {tag_desc}")
+
+    character_block = (
+        "\n".join(character_descriptions)
+        if character_descriptions
+        else "No character descriptions available."
+    )
+
+    # Final formatted image prompt
+    image_prompt = f"""
+Scene:
+{summary}
+
+Characters:
+{character_block}
+
+Style:
+Comic panel illustration, digital art, clean lines.
+Facial expressions should reflect emotion. The setting should be a realistic tech workspace.
+Make sure the scene reads clearly as a single moment in time.
+    """.strip()
+
+    return image_prompt
