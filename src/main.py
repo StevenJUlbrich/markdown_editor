@@ -836,12 +836,15 @@ def main_cli():
 
                 # Collect unique roles from report
                 # Flatten all missing role lists into one set
-                raw_missing_roles = [
-                    entry["missing_roles"]
-                    for entry in report
-                    if entry.get("missing_roles")
-                ]
-                missing_roles_set = set(chain.from_iterable(raw_missing_roles))
+                flat_roles = []
+                for entry in report:
+                    for role in entry.get("missing_roles", []):
+                        if isinstance(role, str):
+                            flat_roles.append(role)
+                        elif isinstance(role, list):
+                            flat_roles.extend([r for r in role if isinstance(r, str)])
+
+                missing_roles_set = set(flat_roles)
 
                 if not missing_roles_set:
                     print("✅ All roles are already covered. No characters needed.")
@@ -864,7 +867,7 @@ def main_cli():
                     int(per_role_input) if per_role_input.strip().isdigit() else 2
                 )
                 generate_character_profiles_for_roles(
-                    list(missing_roles_set),
+                    [r for r in missing_roles_set if isinstance(r, str)],
                     input_json_path=char_path,
                     output_json_path=char_path,
                     characters_per_role=per_role,

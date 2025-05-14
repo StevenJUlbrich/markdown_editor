@@ -14,7 +14,7 @@ def suggest_character_roles_from_context(
 ) -> List[str]:
     """
     Sends a prompt to OpenAI to infer character roles appropriate for visualizing this scene.
-    Returns a list of role strings (e.g., ["SRE Engineer", "Developer", "Junior Dev"])
+    Returns a flat list of role strings (e.g., ["SRE Engineer", "Developer", "Junior Dev"])
     """
     prompt = f"""
 You are a technical storyboard designer for a graphic novel that teaches site reliability engineering (SRE).
@@ -54,7 +54,13 @@ Return only a JSON array like this:
     try:
         parsed = json.loads(raw)
         if isinstance(parsed, list):
-            return parsed
+            flattened = []
+            for item in parsed:
+                if isinstance(item, str):
+                    flattened.append(item)
+                elif isinstance(item, list):
+                    flattened.extend([x for x in item if isinstance(x, str)])
+            return flattened
         else:
             print("OpenAI response was not a list:", parsed)
             return []

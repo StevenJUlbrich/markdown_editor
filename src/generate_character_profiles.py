@@ -1,7 +1,7 @@
 import json
 import time
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from openai import OpenAI
 
@@ -60,7 +60,7 @@ Do not include commentary or explanation.
 
 def parse_response_with_retry(
     content: str, retries: int = 3, delay: float = 1.0
-) -> Dict:
+) -> Dict[str, Any]:
     for attempt in range(retries):
         try:
             if content.startswith("```json"):
@@ -79,12 +79,27 @@ def parse_response_with_retry(
     raise ValueError("❌ Failed to parse OpenAI response after retries.")
 
 
+def clean_and_flatten_roles(roles: List[Any]) -> List[str]:
+    cleaned = []
+    for r in roles:
+        if isinstance(r, str):
+            cleaned.append(r)
+        elif isinstance(r, list):
+            cleaned.extend([x for x in r if isinstance(x, str)])
+        else:
+            print(f"⚠️ Skipping invalid role entry: {r} (type: {type(r)})")
+    return cleaned
+
+
 def generate_character_profiles_for_roles(
-    missing_roles: List[str],
+    missing_roles: List[Any],
     input_json_path: Path,
     output_json_path: Path,
     characters_per_role: int = 2,
 ):
+    # Clean roles early
+    missing_roles = clean_and_flatten_roles(missing_roles)
+
     with open(input_json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
