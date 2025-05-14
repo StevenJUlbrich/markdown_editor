@@ -68,7 +68,21 @@ def process_chapter_for_visual_panels(
         # Step 4: Rewrite scene + teaching as summary
         scene_summary = rewrite_scene_and_teaching_as_summary(scene_md, teaching_md)
 
-        # Step 5: Generate JSON entry for this panel
+        # Step 5: Assign characters for this scene
+        named_characters = []
+        used_names = set()
+        for role in suggested_roles:
+            candidates = [
+                name
+                for name, profile in character_data["characters"].items()
+                if profile.get("role") == role and name not in used_names
+            ]
+            if candidates:
+                chosen = candidates[0]  # or random.choice(candidates) if desired
+                named_characters.append(chosen)
+                used_names.add(chosen)
+
+        # Step 6: Generate panel JSON entry
         filename = f"{chapter_md_path.stem}_panel_{panel_id}.png"
         panel_json = {
             "panel_id": panel_id,
@@ -76,18 +90,18 @@ def process_chapter_for_visual_panels(
             "filename": f"{images_folder}/{filename}",
             "summary": scene_summary,
             "suggested_roles": suggested_roles,
-            "characters_in_frame": [],  # to be filled later
-            "speech_bubbles": [],  # optional
-            "narration": "",  # optional
+            "characters_in_frame": named_characters,
+            "speech_bubbles": [],
+            "narration": "",
         }
         all_panel_json.append(panel_json)
 
-        # Step 6: Insert image into markdown
+        # Step 7: Insert image into markdown
         image_markdown = f"![{panel_title}]({images_folder}/{filename})"
         new_scene_md = f"{scene_summary}\n\n{image_markdown}"
         doc.update_named_section_in_panel(panel_id, "Scene Description", new_scene_md)
 
-    # Step 7: Generate new characters if needed
+    # Step 8: Generate new characters if needed
     if new_roles_needed:
         generate_character_profiles_for_roles(
             list(new_roles_needed),
@@ -95,12 +109,14 @@ def process_chapter_for_visual_panels(
             output_json_path=character_json_path,
             characters_per_role=characters_per_role,
         )
+        # Reload updated character list to ensure downstream panels use new names
+        with open(character_json_path, "r", encoding="utf-8") as f:
+            character_data = json.load(f)
 
-    # Step 8: Save image metadata JSON
+    # Step 9: Save image metadata JSON
     with open(output_json_path, "w", encoding="utf-8") as jf:
         json.dump(all_panel_json, jf, indent=2, ensure_ascii=False)
 
-    # Step 9: Save updated markdown
+    # Step 10: Save updated markdown
     doc.save_document(str(output_md_path))
-
     logger.info("✅ Chapter processed and saved: %s", output_md_path)
