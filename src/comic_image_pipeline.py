@@ -11,7 +11,6 @@ from openai_service import (
     rewrite_scene_and_teaching_as_summary,
     suggest_character_roles_from_context,
 )
-from suggest_character_roles import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
 

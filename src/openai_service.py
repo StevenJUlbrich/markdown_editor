@@ -559,3 +559,156 @@ Example outputs:
     except Exception as e:
         logger.error("OpenAI narration generation failed: %s", str(e))
         return "Narration missing"
+
+
+def generate_speech_bubbles_for_panel(
+    scene_summary: str,
+    character_names: List[str],
+    character_data: Dict,
+    model: str = "gpt-4o-2024-11-20",
+    temperature: float = 0.7,
+) -> Dict[str, str]:
+    """
+    Generate a speech bubble line (or none) per character in the scene.
+
+    Args:
+        scene_summary: Visual and emotional summary of the panel
+        character_names: Characters visible in the panel
+        character_data: Full character profile dictionary
+
+    Returns:
+        Dict mapping character name to speech bubble text
+    """
+    character_lines = []
+    for name in character_names:
+        profile = character_data.get("characters", {}).get(name, {})
+        if not profile:
+            continue
+        role = profile.get("role", "Unknown role")
+        tone = profile.get("voice_tone", "")
+        tags = ", ".join(profile.get("visual_tags", []))
+        character_lines.append(f"- {name} ({role}): {tone}. Tags: {tags}")
+
+    character_block = "\n".join(character_lines)
+
+    prompt = f"""
+You are writing realistic speech bubble text for a comic panel.
+
+Scene:
+{scene_summary}
+
+Characters:
+{character_block}
+
+Instructions:
+- Write up to 1 speech bubble per character.
+- If a character is silently reacting or watching, leave them out.
+- Each bubble should be short (max 15 words), fit in a comic panel, and reflect their personality and role.
+- Do not include any formatting or markdown.
+
+Return only a JSON object like:
+{{
+  "Hector": "Logs say otherwise.",
+  "Wanjiru": "Metrics are green though!"
+}}
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content.strip()
+
+        if content.startswith("```json"):
+            content = content[7:].strip()
+        elif content.startswith("```"):
+            content = content[3:].strip()
+        if content.endswith("```"):
+            content = content[:-3].strip()
+
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            return {k: v for k, v in parsed.items() if isinstance(v, str)}
+        else:
+            return {}
+
+    except Exception as e:
+        logger.error("Failed to generate speech bubbles: %s", str(e))
+        return {}
+
+
+def suggest_character_roles_from_context(
+    panel_title: str,
+    scene_description_md: str,
+    teaching_narrative_md: str,
+    model: str = "gpt-4o-2024-11-20",
+    temperature: float = 0.5,
+) -> List[str]:
+    """
+    Sends a prompt to OpenAI to infer character roles appropriate for visualizing this scene.
+    Returns a flat list of role strings (e.g., ["SRE Engineer", "Developer", "Junior Dev"])
+    """
+    prompt = f"""
+You are a technical storyboard designer for a graphic novel that teaches site reliability engineering (SRE).
+You must decide which character types should be visually present in the following scene.
+
+The scene includes a description and a teaching narrative. Think about what character roles would best convey confusion, expertise, conflict, or insight.
+
+Scene Title: {panel_title}
+
+---
+SCENE DESCRIPTION:
+{scene_description_md}
+
+---
+TEACHING NARRATIVE:
+{teaching_narrative_md}
+
+---
+
+Based on this material, list up to 4 character roles that should appear in the comic panel.
+Use roles like "SRE Engineer", "Junior Developer", "Developer", "Product Owner", "Finance Analyst", etc.
+
+Return only a JSON array like this:
+["SRE Engineer", "Junior Developer"]
+    """
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+    )
+
+    raw = response.choices[0].message.content.strip()
+
+    # Ensure we always return a list of strings
+    try:
+        if raw.startswith("```"):
+            raw = re.sub(
+                r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE
+            )
+
+        parsed = json.loads(raw)
+        flattened = []
+
+        # Handle potentially nested structure
+        def extract_strings(item: Any) -> None:
+            if isinstance(item, str):
+                flattened.append(item)
+            elif isinstance(item, list):
+                for subitem in item:
+                    extract_strings(subitem)
+
+        if isinstance(parsed, list):
+            for item in parsed:
+                extract_strings(item)
+        else:
+            print("Warning: OpenAI response was not a list:", parsed)
+
+        return flattened
+    except Exception as e:
+        print("Failed to parse character role list from OpenAI:", e)
+        print("Raw response was:", raw)
+        return []
