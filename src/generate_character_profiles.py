@@ -5,8 +5,12 @@ from typing import Any, Dict, List
 
 from openai import OpenAI
 
-client = OpenAI()
+from logging_config import get_logger
 
+client = OpenAI()
+logger = get_logger(__name__)
+
+# Example character profile for reference
 EXAMPLE_CHARACTER = {
     "visual_tags": [
         "non-binary",
@@ -97,8 +101,7 @@ def generate_character_profiles_for_roles(
     output_json_path: Path,
     characters_per_role: int = 2,
 ):
-    # Clean roles early
-    missing_roles = clean_and_flatten_roles(missing_roles)
+    cleaned_roles = clean_and_flatten_roles(missing_roles)
 
     with open(input_json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -106,9 +109,9 @@ def generate_character_profiles_for_roles(
     existing_chars = data.get("characters", {})
     existing_names = list(existing_chars.keys())
 
-    prompt = generate_prompt(missing_roles, existing_names, characters_per_role)
+    prompt = generate_prompt(cleaned_roles, existing_names, characters_per_role)
 
-    print("📡 Requesting new characters from OpenAI...")
+    print(f"📡 Requesting new characters from OpenAI for roles: {cleaned_roles}")
     response = client.chat.completions.create(
         model="gpt-4o-2024-11-20",
         messages=[{"role": "user", "content": prompt}],
@@ -118,12 +121,10 @@ def generate_character_profiles_for_roles(
     raw = response.choices[0].message.content.strip()
     try:
         parsed = parse_response_with_retry(raw)
-        new_entries = parsed.get(
-            "characters", parsed
-        )  # fallback if root is already dict
+        new_entries = parsed.get("characters", parsed)
 
         added = 0
-        per_role_counts = {r: 0 for r in missing_roles}
+        per_role_counts = {r: 0 for r in cleaned_roles}
         for name, profile in new_entries.items():
             role = profile.get("role")
             if name not in existing_names and role in per_role_counts:
