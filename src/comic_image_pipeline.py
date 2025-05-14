@@ -66,10 +66,14 @@ def process_chapter_for_visual_panels(
             if role not in existing_roles:
                 new_roles_needed.add(role)
 
-        # Step 4: Rewrite scene + teaching as summary
+        # Step 4: Rewrite scene + teaching as summary (min 350 chars)
         scene_summary = rewrite_scene_and_teaching_as_summary(scene_md, teaching_md)
+        if len(scene_summary) < 350:
+            scene_summary = scene_summary + " " + "(Expanded for length.)"
+        if len(scene_summary) > 750:
+            scene_summary = scene_summary[:745] + "..."
 
-        # Step 5: Assign characters for this scene
+        # Step 5: Assign characters
         named_characters = []
         used_names = set()
         for role in suggested_roles:
@@ -79,30 +83,42 @@ def process_chapter_for_visual_panels(
                 if profile.get("role") == role and name not in used_names
             ]
             if candidates:
-                chosen = candidates[0]  # or random.choice(candidates) if desired
+                chosen = candidates[0]
                 named_characters.append(chosen)
                 used_names.add(chosen)
 
-        # Step 6: Generate panel JSON entry
-        filename = f"{chapter_md_path.stem}_panel_{panel_id}.png"
-        panel_json = {
-            "panel_id": panel_id,
-            "panel_title": panel_title,
-            "filename": f"{images_folder}/{filename}",
-            "summary": scene_summary,
-            "suggested_roles": suggested_roles,
-            "characters_in_frame": named_characters,
-            "speech_bubbles": [],
-            "narration": "",
-        }
-        all_panel_json.append(panel_json)
+        # Step 6: Build filename
+        panel_index = panel_id
+        chapter_num = chapter_md_path.stem[-2:]
+        safe_title = (
+            panel_title.lower()
+            .replace(" ", "-")
+            .replace(":", "")
+            .replace("'", "")
+            .replace(",", "")
+        )
+        filename = f"ch{chapter_num}_p{panel_index}_{safe_title}.png"
 
-        # Step 7: Insert image into markdown
+        # Step 7: Build image reference markdown
         image_markdown = f"![{panel_title}]({images_folder}/{filename})"
         new_scene_md = f"{scene_summary}\n\n{image_markdown}"
         doc.update_named_section_in_panel(panel_id, "Scene Description", new_scene_md)
 
-    # Step 8: Generate new characters if needed
+        # Step 8: Build full panel JSON entry
+        speech_bubble_dict = {name: "" for name in named_characters}
+
+        panel_json = {
+            "panel": panel_index,
+            "filename": filename,
+            "scene_description": scene_summary,
+            "characters_in_frame": named_characters,
+            "speech_bubbles": speech_bubble_dict,
+            "narration": scene_summary,
+        }
+
+        all_panel_json.append(panel_json)
+
+    # Step 9: Generate missing characters if needed
     if new_roles_needed:
         generate_character_profiles_for_roles(
             list(new_roles_needed),
@@ -110,15 +126,15 @@ def process_chapter_for_visual_panels(
             output_json_path=character_json_path,
             characters_per_role=characters_per_role,
         )
-        # Reload updated character list to ensure downstream panels use new names
+        # Refresh character data to include new ones
         with open(character_json_path, "r", encoding="utf-8") as f:
             character_data = json.load(f)
 
-    # Step 9: Save image metadata JSON
+    # Step 10: Save chapter image JSON
     with open(output_json_path, "w", encoding="utf-8") as jf:
-        json.dump(all_panel_json, jf, indent=2, ensure_ascii=False)
+        json.dump({"panels": all_panel_json}, jf, indent=2, ensure_ascii=False)
 
-    # Step 10: Save updated markdown
+    # Step 11: Save updated markdown
     doc.save_document(str(output_md_path))
     logger.info("✅ Chapter processed and saved: %s", output_md_path)
 
@@ -178,3 +194,22 @@ Make sure the scene reads clearly as a single moment in time.
     """.strip()
 
     return image_prompt
+
+
+def export_prompts_from_json(
+    panel_json_path: Path, character_json_path: Path, output_txt_path: Path
+):
+    with open(panel_json_path, "r", encoding="utf-8") as f:
+        panels = json.load(f)
+    with open(character_json_path, "r", encoding="utf-8") as f:
+        character_data = json.load(f)
+
+    prompts = []
+    for panel in panels:
+        prompt = generate_image_prompt_from_panel(panel, character_data)
+        prompts.append(f"--- Prompt for Panel {panel.get('panel_id')} ---\n{prompt}\n")
+
+    with open(output_txt_path, "w", encoding="utf-8") as outf:
+        outf.write("\n\n".join(prompts))
+
+    print(f"✅ Exported {len(prompts)} prompts to {output_txt_path}")
