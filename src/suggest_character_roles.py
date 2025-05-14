@@ -53,8 +53,6 @@ Return only a JSON array like this:
 
     try:
         parsed = json.loads(raw)
-
-        parsed = json.loads(raw)
         if isinstance(parsed, list):
             return parsed
         else:
