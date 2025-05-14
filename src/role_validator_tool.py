@@ -4,9 +4,9 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Union
 
+from comic_image_pipeline import suggest_character_roles_from_context
 from document_model import MarkdownDocument, PanelPydantic
 from logging_config import get_logger
-from suggest_character_roles import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
 
