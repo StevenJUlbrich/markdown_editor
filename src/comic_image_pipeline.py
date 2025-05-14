@@ -1,14 +1,118 @@
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from document_model import MarkdownDocument
 from generate_character_profiles import generate_character_profiles_for_roles
 from logging_config import get_logger
-from openai_service import rewrite_scene_and_teaching_as_summary
+from openai_service import (
+    generate_narration_title_for_panel,
+    generate_speech_bubbles_for_panel,
+    rewrite_scene_and_teaching_as_summary,
+    suggest_character_roles_from_context,
+)
 from suggest_character_roles import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
+
+
+def process_panel_to_json(
+    doc: MarkdownDocument,
+    panel,
+    character_data: Dict,
+    character_json_path: Path,
+    characters_per_role: int,
+    chapter_prefix: str,
+    images_folder: str,
+) -> Optional[Dict]:
+    panel_id = panel.panel_number_in_doc
+    panel_title = panel.panel_title_text
+
+    sections = doc.extract_named_sections_from_panel(panel_id)
+    scene_md = sections.get("Scene Description", "")
+    teaching_md = sections.get("Teaching Narrative", "")
+
+    if not scene_md.strip() and not teaching_md.strip():
+        logger.warning("Panel %s has no Scene or Teaching Narrative.", panel_title)
+        return None
+
+    # Step 1: Suggest roles
+    suggested_roles = suggest_character_roles_from_context(
+        panel_title=panel_title,
+        scene_description_md=scene_md,
+        teaching_narrative_md=teaching_md,
+    )
+
+    # Step 2: Create missing characters
+    existing_roles = {
+        c["role"] for c in character_data.get("characters", {}).values() if "role" in c
+    }
+    new_roles = [r for r in suggested_roles if r not in existing_roles]
+    if new_roles:
+        generate_character_profiles_for_roles(
+            new_roles,
+            input_json_path=character_json_path,
+            output_json_path=character_json_path,
+            characters_per_role=characters_per_role,
+        )
+        # Reload character file
+        with open(character_json_path, "r", encoding="utf-8") as f:
+            character_data = json.load(f)
+
+    # Step 3: Assign character names for roles
+    characters_in_frame = []
+    used_names = set()
+    for role in suggested_roles:
+        candidates = [
+            name
+            for name, profile in character_data["characters"].items()
+            if profile.get("role") == role and name not in used_names
+        ]
+        if candidates:
+            chosen = candidates[0]
+            characters_in_frame.append(chosen)
+            used_names.add(chosen)
+
+    # Step 4: Generate situational scene description
+    scene_summary = rewrite_scene_and_teaching_as_summary(scene_md, teaching_md)
+    scene_summary = scene_summary.strip()
+    if len(scene_summary) < 350:
+        scene_summary += " (Expanded.)"
+    elif len(scene_summary) > 750:
+        scene_summary = scene_summary[:745] + "..."
+
+    # Step 5: Generate speech bubbles
+    speech_bubbles = generate_speech_bubbles_for_panel(
+        scene_summary, characters_in_frame, character_data
+    )
+
+    # Step 6: Generate narration
+    narration = generate_narration_title_for_panel(scene_md, teaching_md)
+
+    # Step 7: Build filename
+    safe_title = (
+        panel_title.lower()
+        .replace(" ", "-")
+        .replace(":", "")
+        .replace("'", "")
+        .replace(",", "")
+    )
+    filename = f"{chapter_prefix}_p{panel_id}_{safe_title}.png"
+
+    # Step 8: Update markdown
+    image_markdown = f"![{panel_title}]({images_folder}/{filename})"
+    updated_scene = f"{scene_summary}\n\n{image_markdown}"
+    doc.update_named_section_in_panel(panel_id, "Scene Description", updated_scene)
+
+    # Step 9: Final JSON entry
+    return {
+        "panel": panel_id,
+        "filename": filename,
+        "scene_description": scene_summary,
+        "characters_in_frame": characters_in_frame,
+        "speech_bubbles": speech_bubbles,
+        "narration": narration,
+    }
 
 
 def process_chapter_for_visual_panels(
@@ -28,115 +132,33 @@ def process_chapter_for_visual_panels(
     with open(character_json_path, "r", encoding="utf-8") as f:
         character_data = json.load(f)
 
-    existing_roles = {
-        c["role"] for c in character_data.get("characters", {}).values() if "role" in c
-    }
-
     all_panel_json = []
-    new_roles_needed = set()
+    chapter_prefix = chapter_md_path.stem.lower()  # e.g. "chapter_03"
 
     for panel in doc.chapter_model.document_elements:
         if not hasattr(panel, "panel_number_in_doc"):
             continue
 
-        panel_id = panel.panel_number_in_doc
-        panel_title = panel.panel_title_text
-
-        # Step 1: Extract sections
-        sections = doc.extract_named_sections_from_panel(panel_id)
-        scene_md = sections.get("Scene Description", "")
-        teaching_md = sections.get("Teaching Narrative", "")
-        if not scene_md.strip() and not teaching_md.strip():
-            logger.warning(
-                "Skipping Panel ID %s (%s): no scene or teaching content",
-                panel_id,
-                panel_title,
-            )
-            continue
-
-        # Step 2: Suggest roles
-        suggested_roles = suggest_character_roles_from_context(
-            panel_title=panel_title,
-            scene_description_md=scene_md,
-            teaching_narrative_md=teaching_md,
-        )
-
-        # Step 3: Detect and collect missing roles
-        for role in suggested_roles:
-            if role not in existing_roles:
-                new_roles_needed.add(role)
-
-        # Step 4: Rewrite scene + teaching as summary (min 350 chars)
-        scene_summary = rewrite_scene_and_teaching_as_summary(scene_md, teaching_md)
-        if len(scene_summary) < 350:
-            scene_summary = scene_summary + " " + "(Expanded for length.)"
-        if len(scene_summary) > 750:
-            scene_summary = scene_summary[:745] + "..."
-
-        # Step 5: Assign characters
-        named_characters = []
-        used_names = set()
-        for role in suggested_roles:
-            candidates = [
-                name
-                for name, profile in character_data["characters"].items()
-                if profile.get("role") == role and name not in used_names
-            ]
-            if candidates:
-                chosen = candidates[0]
-                named_characters.append(chosen)
-                used_names.add(chosen)
-
-        # Step 6: Build filename
-        panel_index = panel_id
-        chapter_num = chapter_md_path.stem[-2:]
-        safe_title = (
-            panel_title.lower()
-            .replace(" ", "-")
-            .replace(":", "")
-            .replace("'", "")
-            .replace(",", "")
-        )
-        filename = f"ch{chapter_num}_p{panel_index}_{safe_title}.png"
-
-        # Step 7: Build image reference markdown
-        image_markdown = f"![{panel_title}]({images_folder}/{filename})"
-        new_scene_md = f"{scene_summary}\n\n{image_markdown}"
-        doc.update_named_section_in_panel(panel_id, "Scene Description", new_scene_md)
-
-        # Step 8: Build full panel JSON entry
-        speech_bubble_dict = {name: "" for name in named_characters}
-
-        panel_json = {
-            "panel": panel_index,
-            "filename": filename,
-            "scene_description": scene_summary,
-            "characters_in_frame": named_characters,
-            "speech_bubbles": speech_bubble_dict,
-            "narration": scene_summary,
-        }
-
-        all_panel_json.append(panel_json)
-
-    # Step 9: Generate missing characters if needed
-    if new_roles_needed:
-        generate_character_profiles_for_roles(
-            list(new_roles_needed),
-            input_json_path=character_json_path,
-            output_json_path=character_json_path,
+        panel_json = process_panel_to_json(
+            doc=doc,
+            panel=panel,
+            character_data=character_data,
+            character_json_path=character_json_path,
             characters_per_role=characters_per_role,
+            chapter_prefix=chapter_prefix,
+            images_folder=images_folder,
         )
-        # Refresh character data to include new ones
-        with open(character_json_path, "r", encoding="utf-8") as f:
-            character_data = json.load(f)
 
-    # Step 10: Save chapter image JSON
+        if panel_json:
+            all_panel_json.append(panel_json)
+
+    # Save final chapter image JSON
     with open(output_json_path, "w", encoding="utf-8") as jf:
         json.dump({"panels": all_panel_json}, jf, indent=2, ensure_ascii=False)
 
-    # Step 11: Save updated markdown
+    # Save final markdown file
     doc.save_document(str(output_md_path))
-    logger.info("✅ Chapter processed and saved: %s", output_md_path)
+    logger.info("✅ Chapter markdown + panel JSON saved.")
 
 
 def generate_image_prompt_from_panel(panel_json: Dict, character_data: Dict) -> str:

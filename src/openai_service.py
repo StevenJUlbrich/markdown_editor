@@ -512,3 +512,50 @@ Write a single-paragraph summary suitable for visualizing in a comic panel. Do n
     except Exception as e:
         logger.error("OpenAI error in scene summary generation: %s", str(e))
         return "A visual summary of this scene could not be generated."
+
+
+def generate_narration_title_for_panel(
+    scene_md: str,
+    teaching_md: str,
+    model: str = "gpt-4o-2024-11-20",
+    temperature: float = 0.3,
+) -> str:
+    """
+    Generates a short 3–5 word narration summary for a panel, based on its source content.
+    """
+    prompt = f"""
+You are writing short narration tags for comic panels in a technical learning comic.
+
+Below is the scene and teaching content for one panel.
+
+Your task is to write a **very short narration line** (3 to 5 words) that captures the core idea or tension of the scene.
+
+Scene Description:
+---
+{scene_md}
+
+---
+
+Teaching Narrative:
+---
+{teaching_md}
+
+---
+
+Return only a short title. No quotes, no markdown, no formatting.
+Example outputs: 
+- "Hidden Errors Emerge"
+- "Green But Failing"
+- "Metrics Mislead Everyone"
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        logger.error("OpenAI narration generation failed: %s", str(e))
+        return "Narration missing"
