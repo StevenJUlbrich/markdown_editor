@@ -463,3 +463,52 @@ def strip_markdown_fences(markdown_content: str) -> str:
             return strip_markdown_fences(cleaned)
 
     return cleaned
+
+
+def rewrite_scene_and_teaching_as_summary(
+    scene_markdown: str,
+    teaching_markdown: str,
+    model: str = "gpt-4o-2024-11-20",
+    temperature: float = 0.4,
+) -> str:
+    """
+    Calls OpenAI to rewrite a scene description and teaching narrative
+    into a concise, visually friendly summary for a comic panel.
+    """
+    prompt = f"""
+You are writing a short, vivid scene summary for a comic panel based on technical teaching material.
+
+Below is the raw material: a Scene Description and a Teaching Narrative.
+
+Your task is to summarize them into one paragraph that captures:
+- The key moment or emotion of the scene,
+- Any conflict or learning opportunity,
+- Any visual cues (e.g. dashboards, people reacting, stress, insight),
+- And tone appropriate for a learning comic (engaging, clear, not overly dramatic).
+
+Avoid technical jargon unless necessary. Make it easy to visualize. Do not mention "scene description" or "teaching narrative."
+
+Scene Description:
+---
+{scene_markdown.strip()}
+---
+
+Teaching Narrative:
+---
+{teaching_markdown.strip()}
+---
+
+Write a single-paragraph summary suitable for visualizing in a comic panel. Do not include quotes or markdown.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content.strip()
+        return content
+    except Exception as e:
+        logger.error("OpenAI error in scene summary generation: %s", str(e))
+        return "A visual summary of this scene could not be generated."
