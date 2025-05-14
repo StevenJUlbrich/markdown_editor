@@ -1,6 +1,10 @@
 # diff_utils.py
 import difflib
 
+from logging_config import setup_logging
+
+setup_logging()
+
 # ANSI escape codes for colors
 COLOR_GREEN = "\033[92m"  # Green for additions
 COLOR_RED = "\033[91m"  # Red for deletions

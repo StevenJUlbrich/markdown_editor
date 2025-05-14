@@ -10,6 +10,7 @@ from logging_config import get_logger
 client = OpenAI()
 logger = get_logger(__name__)
 
+# Example character profile for reference
 EXAMPLE_CHARACTER = {
     "visual_tags": [
         "non-binary",
@@ -102,9 +103,6 @@ def generate_character_profiles_for_roles(
 ):
     cleaned_roles = clean_and_flatten_roles(missing_roles)
 
-    if not cleaned_roles:
-        raise ValueError("No valid roles to process after cleanup.")
-
     with open(input_json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -127,14 +125,9 @@ def generate_character_profiles_for_roles(
 
         added = 0
         per_role_counts = {r: 0 for r in cleaned_roles}
-
         for name, profile in new_entries.items():
             role = profile.get("role")
-            if (
-                name not in existing_names
-                and isinstance(role, str)
-                and role in per_role_counts
-            ):
+            if name not in existing_names and role in per_role_counts:
                 existing_chars[name] = profile
                 added += 1
                 per_role_counts[role] += 1
