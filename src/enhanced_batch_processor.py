@@ -7,8 +7,8 @@ from logging_config import get_logger
 from openai_service import (
     get_enhancement_suggestions_for_panel_h3s,
     get_improved_markdown_for_section,
+    suggest_character_roles_from_context,
 )
-from suggest_character_roles import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
 

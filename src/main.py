@@ -129,6 +129,7 @@ def main_cli():
         "15": "Validate Role Coverage in Markdown Files",
         "16": "Generate Characters for Missing Roles and Patch JSON",
         "17": "Scan Markdown Folder and Patch Character JSON with Missing Roles",
+        "18": "Generate Comic Panel JSON + Update Markdown (Full Visual Pipeline)",
         "0": "Exit",
     }
     # Determine the highest valid numeric choice for the main menu
@@ -609,7 +610,7 @@ def main_cli():
                 if save_to_file:
                     try:
                         with open(save_to_file, "w", encoding="utf-8") as f:
-                            f.write(json_output)
+                            f.write(json_output, ensure_ascii=False)
                         print(f"  Successfully saved JSON to {save_to_file}")
                     except Exception as e:
                         print(f"  Error saving JSON to file: {e}")
@@ -874,6 +875,55 @@ def main_cli():
                 )
             except Exception as e:
                 print(f"❌ Error: {e}")
+
+        elif choice == "18":
+            print("\n--- Full Comic Panel Pipeline ---")
+            chapter_path_str = input("Enter path to markdown file: ").strip()
+            char_json_path_str = input("Enter path to character JSON: ").strip()
+            output_md_str = input("Enter output path for updated markdown: ").strip()
+            output_json_str = input("Enter output path for panel JSON: ").strip()
+            image_folder = input("Enter image folder name (default: images): ").strip()
+            per_role_input = input("Characters per role (default: 2): ").strip()
+
+            if (
+                not chapter_path_str
+                or not char_json_path_str
+                or not output_md_str
+                or not output_json_str
+            ):
+                print("  Missing required inputs. Cancelling operation.")
+                continue
+
+            try:
+                from comic_image_pipeline import process_chapter_for_visual_panels
+
+                chapter_path = Path(chapter_path_str)
+                char_json_path = Path(char_json_path_str)
+                output_md = Path(output_md_str)
+                output_json = Path(output_json_str)
+
+                if not chapter_path.exists():
+                    print(f"  Markdown file not found: {chapter_path}")
+                    continue
+                if not char_json_path.exists():
+                    print(f"  Character JSON not found: {char_json_path}")
+                    continue
+
+                per_role = (
+                    int(per_role_input) if per_role_input.strip().isdigit() else 2
+                )
+                image_folder = image_folder or "images"
+
+                process_chapter_for_visual_panels(
+                    chapter_md_path=chapter_path,
+                    character_json_path=char_json_path,
+                    output_md_path=output_md,
+                    output_json_path=output_json,
+                    images_folder=image_folder,
+                    characters_per_role=per_role,
+                )
+            except Exception as e:
+                print(f"❌ Error running comic panel pipeline: {e}")
 
         else:
             print(

@@ -511,7 +511,7 @@ class AppController:
 
             import json  # Standard library
 
-            return json.dumps(cleaned_chapter_dict, indent=2)
+            return json.dumps(cleaned_chapter_dict, indent=2, ensure_ascii=False)
 
         except AttributeError:
             print(
