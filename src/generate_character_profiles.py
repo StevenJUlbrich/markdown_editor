@@ -84,14 +84,31 @@ def parse_response_with_retry(
 
 
 def clean_and_flatten_roles(roles: List[Any]) -> List[str]:
+    """
+    Recursively flattens any nested lists and ensures only string roles are returned.
+
+    Args:
+        roles: A list that may contain strings, lists, or other types
+
+    Returns:
+        A flattened list containing only string values
+    """
     cleaned = []
-    for r in roles:
-        if isinstance(r, str):
-            cleaned.append(r)
-        elif isinstance(r, list):
-            cleaned.extend([x for x in r if isinstance(x, str)])
+
+    def flatten(item):
+        if isinstance(item, str):
+            cleaned.append(item)
+        elif isinstance(item, list):
+            for subitem in item:
+                flatten(subitem)
         else:
-            print(f"⚠️ Skipping invalid role entry: {r} (type: {type(r)})")
+            print(
+                f"⚠️ Skipping invalid role entry: {item} (type: {type(item).__name__})"
+            )
+
+    for r in roles:
+        flatten(r)
+
     return cleaned
 
 
