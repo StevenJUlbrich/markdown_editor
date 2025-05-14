@@ -122,7 +122,14 @@ def process_chapter_for_visual_panels(
     images_folder: str = "images",
     characters_per_role: int = 2,
 ):
+
+    # Check if the input path is a file
+    if not chapter_md_path.is_file():
+        logger.error("❌ Input path is not a file: %s", chapter_md_path)
+        return
+
     doc = MarkdownDocument(filepath=str(chapter_md_path))
+
     if not doc.chapter_model:
         logger.error("❌ Failed to parse: %s", chapter_md_path.name)
         return

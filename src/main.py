@@ -906,10 +906,14 @@ def main_cli():
 
         elif choice == "18":
             print("\n--- Full Comic Panel Pipeline ---")
-            chapter_path_str = input("Enter path to markdown file: ").strip()
-            char_json_path_str = input("Enter path to character JSON: ").strip()
-            output_md_str = input("Enter output path for updated markdown: ").strip()
-            output_json_str = input("Enter output path for panel JSON: ").strip()
+            chapter_path_str = input(
+                "Enter path to a specific markdown file (not a directory): "
+            ).strip()
+            char_json_path_str = input("Enter path to character JSON file: ").strip()
+            output_md_str = input(
+                "Enter output path for updated markdown file: "
+            ).strip()
+            output_json_str = input("Enter output path for panel JSON file: ").strip()
             image_folder = input("Enter image folder name (default: images): ").strip()
             per_role_input = input("Characters per role (default: 2): ").strip()
 
