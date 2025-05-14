@@ -609,7 +609,7 @@ def main_cli():
                 if save_to_file:
                     try:
                         with open(save_to_file, "w", encoding="utf-8") as f:
-                            f.write(json_output)
+                            f.write(json_output, ensure_ascii=False)
                         print(f"  Successfully saved JSON to {save_to_file}")
                     except Exception as e:
                         print(f"  Error saving JSON to file: {e}")

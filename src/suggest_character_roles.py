@@ -1,8 +1,28 @@
+"""
+Fixed version of suggest_character_roles.py to ensure consistent return type
+"""
+
 import json
 import re
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from openai_service import client
+
+
+def clean_json_list_from_fenced_response(raw: str) -> List[str]:
+    """Clean JSON list from code-fenced response"""
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE)
+    try:
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, list):
+            return [item for item in parsed if isinstance(item, str)]
+        else:
+            print("Warning: OpenAI response was not a list:", parsed)
+            return []
+    except Exception as e:
+        print("Warning: Failed to parse JSON response:", e)
+        print("Raw response was:", raw)
+        return []
 
 
 def suggest_character_roles_from_context(
@@ -48,23 +68,33 @@ Return only a JSON array like this:
     )
 
     raw = response.choices[0].message.content.strip()
-    if raw.startswith("```"):
-        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE)
 
+    # Ensure we always return a list of strings
     try:
+        if raw.startswith("```"):
+            raw = re.sub(
+                r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.IGNORECASE
+            )
+
         parsed = json.loads(raw)
+        flattened = []
+
+        # Handle potentially nested structure
+        def extract_strings(item: Any) -> None:
+            if isinstance(item, str):
+                flattened.append(item)
+            elif isinstance(item, list):
+                for subitem in item:
+                    extract_strings(subitem)
+
         if isinstance(parsed, list):
-            flattened = []
             for item in parsed:
-                if isinstance(item, str):
-                    flattened.append(item)
-                elif isinstance(item, list):
-                    flattened.extend([x for x in item if isinstance(x, str)])
-            return flattened
+                extract_strings(item)
         else:
-            print("OpenAI response was not a list:", parsed)
-            return []
+            print("Warning: OpenAI response was not a list:", parsed)
+
+        return flattened
     except Exception as e:
         print("Failed to parse character role list from OpenAI:", e)
-        print("Raw response was:\n", raw)
+        print("Raw response was:", raw)
         return []

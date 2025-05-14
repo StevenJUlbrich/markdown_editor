@@ -160,7 +160,7 @@ def generate_character_profiles_for_roles(
 
         data["characters"] = existing_chars
         with open(output_json_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
+            json.dump(data, f, indent=2, ensure_ascii=False)
         print(f"\n💾 Saved updated character file to: {output_json_path}")
 
     except Exception as e:
