@@ -131,6 +131,30 @@ class ChapterPydantic(BaseModel):
         default_factory=list
     )
 
+    def get_scene_balance_feedback(self) -> str:
+        counts = self.get_scene_distribution()
+        total = sum(counts.values())
+
+        feedback = []
+        if counts.get("Teaching Scene", 0) > total * 0.7:
+            feedback.append(
+                "⚠️ Heavy on Teaching Scenes — consider breaking up with chaos or decisions."
+            )
+        if counts.get("Chaos Scene", 0) < 1:
+            feedback.append(
+                "⚠️ No Chaos Scene? Add tension, incidents, or operational disruption."
+            )
+        if "Reflection Scene" not in counts:
+            feedback.append(
+                "⚠️ Missing Reflection Scene. Consider a quieter, summarizing panel."
+            )
+        if "Meta Scene" not in counts:
+            feedback.append(
+                "⚠️ No Meta Scene. Could add conceptual grounding or diagrams."
+            )
+
+        return "\n".join(feedback) or "✅ Scene distribution looks balanced."
+
     def get_scene_distribution(self) -> Dict[str, int]:
         counts = {}
         for el in self.document_elements:
