@@ -27,7 +27,13 @@ def process_panel_to_json(
     import json
     from pathlib import Path
 
-    from openai_service import infer_scene_tags_for_panel
+    from openai_service import (
+        generate_narration_title_for_panel,
+        generate_scene_analysis_from_ai,
+        generate_speech_bubbles_for_panel,
+        infer_scene_tags_for_panel,
+        rewrite_scene_and_teaching_as_summary,
+    )
 
     panel_id = panel.panel_number_in_doc
     panel_title = panel.panel_title_text
@@ -40,16 +46,11 @@ def process_panel_to_json(
         logger.warning("Panel %s has no Scene or Teaching Narrative.", panel_title)
         return None
 
-    # 🔹 NEW: Get detailed AI-driven scene analysis
-    from openai_service import generate_scene_analysis_from_ai
-
+    # 🔹 STEP 1: Generate scene analysis and assign to panel
     scene_analysis = generate_scene_analysis_from_ai(scene_md, teaching_md)
     panel.scene_analysis = scene_analysis
 
-    # 🔹 STEP 1: Tag scene type(s)
-    scene_tags = infer_scene_tags_for_panel(scene_md, teaching_md)
-
-    # 🔹 STEP 2: Get required roles from tag map
+    # 🔹 STEP 2: Resolve required roles from scene type
     tag_to_roles = {
         "Teaching Scene": ["Senior SRE", "Junior Developer", "Product Owner"],
         "Chaos Scene": ["Support Engineer", "Angry Customer", "SRE Engineer"],
@@ -57,11 +58,11 @@ def process_panel_to_json(
         "Meta Scene": ["Senior SRE"],
     }
     required_roles = set()
-    for tag in scene_tags:
+    for tag in scene_analysis.scene_types:
         required_roles.update(tag_to_roles.get(tag, []))
     required_roles = list(required_roles)
 
-    # 🔹 STEP 3: Ensure characters for needed roles exist
+    # 🔹 STEP 3: Ensure required characters exist
     existing_roles = {
         c["role"] for c in character_data.get("characters", {}).values() if "role" in c
     }
@@ -76,7 +77,7 @@ def process_panel_to_json(
         with open(character_json_path, "r", encoding="utf-8") as f:
             character_data = json.load(f)
 
-    # 🔹 STEP 4: Assign characters for required roles
+    # 🔹 STEP 4: Assign characters to roles
     role_to_character = {}
     used_names = set()
     for role in required_roles:
@@ -92,20 +93,20 @@ def process_panel_to_json(
 
     characters_in_frame = list(role_to_character.values())
 
-    # 🔹 STEP 5: Rewrite scene summary
+    # 🔹 STEP 5: Generate scene summary
     scene_summary = rewrite_scene_and_teaching_as_summary(scene_md, teaching_md).strip()
     if len(scene_summary) < 350:
         scene_summary += " (Expanded.)"
     elif len(scene_summary) > 750:
         scene_summary = scene_summary[:745] + "..."
 
-    # 🔹 STEP 6: Generate speech bubbles and narration
+    # 🔹 STEP 6: Generate narration + speech bubbles
     speech_bubbles = generate_speech_bubbles_for_panel(
         scene_summary, characters_in_frame, character_data
     )
     narration = generate_narration_title_for_panel(scene_md, teaching_md)
 
-    # 🔹 STEP 7: Generate image markdown
+    # 🔹 STEP 7: Update panel scene markdown
     safe_title = (
         panel_title.lower()
         .replace(" ", "-")
@@ -118,17 +119,17 @@ def process_panel_to_json(
     updated_scene = f"{scene_summary}\n\n{image_markdown}"
     doc.update_named_section_in_panel(panel_id, "Scene Description", updated_scene)
 
-    # 🔹 STEP 8: Return structured JSON with roles
+    # 🔹 STEP 8: Return panel metadata for JSON output
     return {
         "panel": panel_id,
         "filename": filename,
-        "scene_tags": scene_tags,
+        "scene_tags": scene_analysis.scene_types,
+        "scene_analysis": scene_analysis.model_dump(),  # ✅ updated here
         "scene_description": scene_summary,
         "characters_in_frame": characters_in_frame,
         "character_roles": role_to_character,
         "speech_bubbles": speech_bubbles,
         "narration": narration,
-        "scene_analysis": scene_analysis.model_dump(),
     }
 
 
