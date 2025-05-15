@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 
 from document_model import SceneAnalysisPydantic
 from logging_config import get_logger
-from openai_service import client
 
 logger = get_logger(__name__)
 
