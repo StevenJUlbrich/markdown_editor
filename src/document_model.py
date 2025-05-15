@@ -78,6 +78,17 @@ except Exception as e:
     print("Further Mistletoe operations will likely fail.")
 
 
+class SceneAnalysisPydantic(BaseModel):
+    scene_types: List[str]
+    inferred_by_ai: bool = True
+    raw_summary: Optional[str] = None
+    location: Optional[str] = None
+    time_of_day: Optional[str] = None
+    tone: Optional[str] = None  # calm, tense, reflective, chaotic, etc.
+    teaching_level: Optional[str] = None  # basic, advanced, metaphorical, meta
+    notes: Optional[str] = None
+
+
 # --- Pydantic Models ---
 class H4Pydantic(BaseModel):
     heading_text: str
@@ -104,6 +115,7 @@ class PanelPydantic(BaseModel):
     mistletoe_h2_block: Optional[Any] = None
     h3_sections: List[H3Pydantic] = Field(default_factory=list)
     panel_number_in_doc: Optional[int] = None
+    scene_analysis: Optional[SceneAnalysisPydantic] = None
 
 
 class GenericContentPydantic(BaseModel):
@@ -118,6 +130,14 @@ class ChapterPydantic(BaseModel):
     document_elements: List[Union[GenericContentPydantic, PanelPydantic]] = Field(
         default_factory=list
     )
+
+    def get_scene_distribution(self) -> Dict[str, int]:
+        counts = {}
+        for el in self.document_elements:
+            if isinstance(el, PanelPydantic) and el.scene_analysis:
+                for tag in el.scene_analysis.scene_types:
+                    counts[tag] = counts.get(tag, 0) + 1
+        return counts
 
 
 # --- Main Document Class ---

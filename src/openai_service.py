@@ -6,7 +6,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
+from document_model import SceneAnalysisPydantic
 from logging_config import get_logger
+from openai_service import client
 
 logger = get_logger(__name__)
 
@@ -728,3 +730,85 @@ def infer_scene_tags_for_panel(scene_md: str, teaching_md: str) -> List[str]:
     if not tags:
         tags.append("Teaching Scene")  # default
     return tags
+
+
+def generate_scene_analysis_from_ai(
+    scene_markdown: str, teaching_markdown: str, model: str = "gpt-4o-2024-11-20"
+) -> SceneAnalysisPydantic:
+    """
+    Uses OpenAI to analyze a panel and generate a structured SceneAnalysisPydantic object.
+
+    Args:
+        scene_markdown: The scene description from the markdown panel
+        teaching_markdown: The teaching narrative from the markdown panel
+        model: The OpenAI model to use
+
+    Returns:
+        SceneAnalysisPydantic instance with AI-inferred tags and metadata
+    """
+
+    prompt = f"""
+You are analyzing a scene and its teaching narrative from a visual technical comic.
+
+Read the following and classify the scene based on tone, intent, and structure.
+
+Scene Description:
+---
+{scene_markdown.strip()}
+---
+
+Teaching Narrative:
+---
+{teaching_markdown.strip()}
+---
+
+Return your analysis as a JSON object with the following fields:
+{{
+  "scene_types": ["list of tags like Teaching Scene, Chaos Scene, Reflection Scene, Meta Scene, Decision Scene"],
+  "tone": "describe the emotional feel, e.g., calm, tense, fast-paced",
+  "location": "where does it take place, if mentioned",
+  "time_of_day": "e.g., 2 AM, morning, late night, or None",
+  "teaching_level": "basic, intermediate, advanced, metaphorical, meta",
+  "notes": "anything else that might be useful to know about this scene"
+}}
+
+Respond with ONLY a single valid JSON object. Do not wrap in markdown fences. No commentary.
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+        )
+        content = response.choices[0].message.content.strip()
+
+        # Clean potential accidental markdown fences
+        if content.startswith("```json"):
+            content = content[7:]
+        elif content.startswith("```"):
+            content = content[3:]
+        if content.endswith("```"):
+            content = content[:-3]
+
+        data = json.loads(content)
+
+        return SceneAnalysisPydantic(
+            scene_types=data.get("scene_types", []),
+            tone=data.get("tone"),
+            location=data.get("location"),
+            time_of_day=data.get("time_of_day"),
+            teaching_level=data.get("teaching_level"),
+            notes=data.get("notes"),
+            raw_summary=f"{scene_markdown.strip()}\n\n{teaching_markdown.strip()}",
+            inferred_by_ai=True,
+        )
+
+    except Exception as e:
+        print("❌ Error during scene analysis generation:", e)
+        print("Raw response:", content if "content" in locals() else "None")
+        return SceneAnalysisPydantic(
+            scene_types=["Teaching Scene"],
+            inferred_by_ai=True,
+            notes="Fallback to default scene type due to AI error.",
+        )

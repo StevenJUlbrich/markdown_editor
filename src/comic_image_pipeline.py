@@ -40,6 +40,12 @@ def process_panel_to_json(
         logger.warning("Panel %s has no Scene or Teaching Narrative.", panel_title)
         return None
 
+    # 🔹 NEW: Get detailed AI-driven scene analysis
+    from openai_service import generate_scene_analysis_from_ai
+
+    scene_analysis = generate_scene_analysis_from_ai(scene_md, teaching_md)
+    panel.scene_analysis = scene_analysis
+
     # 🔹 STEP 1: Tag scene type(s)
     scene_tags = infer_scene_tags_for_panel(scene_md, teaching_md)
 
@@ -122,6 +128,7 @@ def process_panel_to_json(
         "character_roles": role_to_character,
         "speech_bubbles": speech_bubbles,
         "narration": narration,
+        "scene_analysis": scene_analysis.model_dump(),
     }
 
 
@@ -181,60 +188,69 @@ def process_chapter_for_visual_panels(
 def generate_image_prompt_from_panel(panel_json: Dict, character_data: Dict) -> str:
     """
     Constructs a detailed image generation prompt for a comic panel,
-    including scene summary and visual descriptions of each character.
+    using structured character-role mapping and scene tags.
 
     Args:
-        panel_json: One panel entry from chapter_images.json
+        panel_json: A single panel entry from chapter_image.json
         character_data: Full character JSON dictionary
 
     Returns:
-        A complete prompt string suitable for image generation
+        A formatted prompt string suitable for image generation
     """
-    summary = panel_json.get("scene_description") or panel_json.get("summary", "")
-    summary = summary.strip()
-
+    # Step 1: Extract scene summary
+    summary = panel_json.get("scene_description", "").strip()
     if not summary:
         return "Scene summary missing."
 
-    # Ensure minimum length
-    if len(summary) < 350:
-        summary = f"This scene should be more detailed: {summary}"
-    elif len(summary) > 750:
-        summary = summary[:745] + "..."
-
+    # Step 2: Determine characters and roles
     characters = panel_json.get("characters_in_frame", [])
+    role_map = panel_json.get("character_roles", {})
+
     character_descriptions = []
 
     for name in characters:
         profile = character_data.get("characters", {}).get(name, {})
         if not profile:
             continue
+
         role = profile.get("role", "Unknown role")
         visual_tags = profile.get("visual_tags", [])
         tag_desc = ", ".join(visual_tags)
-        character_descriptions.append(f"- {name}: {role}. Visual tags: {tag_desc}")
+        motion = profile.get("motion_rules", "neutral movement")
+        tone = profile.get("voice_tone", "neutral")
 
-    character_block = (
-        "\n".join(character_descriptions)
-        if character_descriptions
-        else "No character descriptions available."
-    )
+        character_descriptions.append(
+            f"- **{name}** ({role}): {tag_desc}\n  - Motion: {motion}\n  - Voice tone: {tone}"
+        )
 
-    # Final formatted image prompt
-    image_prompt = f"""
-Scene:
+    if not character_descriptions:
+        character_descriptions.append("No character descriptions available.")
+
+    scene_tags = panel_json.get("scene_tags", [])
+    scene_type_str = ", ".join(scene_tags) if scene_tags else "Unspecified scene type"
+
+    # Step 3: Build final prompt
+    prompt = f"""
+**Scene Type**: {scene_type_str}
+
+**Scene Summary**:
 {summary}
 
-Characters:
-{character_block}
+**Characters**:
+{chr(10).join(character_descriptions)}
 
-Style:
-Comic panel illustration, digital art, clean lines.
-Facial expressions should reflect emotion. The setting should be a realistic tech workspace.
-Make sure the scene reads clearly as a single moment in time.
-    """.strip()
+**Instructions**:
+- Create a comic panel illustration in clean digital style.
+- Use expressive body language and facial expressions to show the emotional tone.
+- Layout should reflect a single snapshot in time, clearly showing the tension or insight.
+- If the scene is a Teaching or Reflection scene, the Senior SRE (e.g., Hector or Juana) should appear calm, analytical, or observational.
+- If the scene is a Chaos scene, show action, tension, or confusion.
+- Background elements like terminals, dashboards, or conference tables should match the setting.
 
-    return image_prompt
+**Visual Style**:
+Modern comic panel, clean lines, expressive characters, detailed backgrounds.
+"""
+    return prompt.strip()
 
 
 def export_prompts_from_json(
