@@ -712,3 +712,19 @@ Return only a JSON array like this:
         print("Failed to parse character role list from OpenAI:", e)
         print("Raw response was:", raw)
         return []
+
+
+def infer_scene_tags_for_panel(scene_md: str, teaching_md: str) -> List[str]:
+    tags = []
+    text = f"{scene_md}\n{teaching_md}".lower()
+    if "confusion" in text or "customer calls" in text:
+        tags.append("Chaos Scene")
+    if "checklist" in text or "lesson" in text or "recommend" in text:
+        tags.append("Teaching Scene")
+    if "after" in text or "reflection" in text or "retrospective" in text:
+        tags.append("Reflection Scene")
+    if "triangle" in text or "pillars" in text:
+        tags.append("Meta Scene")
+    if not tags:
+        tags.append("Teaching Scene")  # default
+    return tags
