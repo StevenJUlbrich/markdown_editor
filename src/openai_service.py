@@ -12,6 +12,50 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def suggest_character_roles_for_panels(
+    panels: List[Dict],  # Each dict: { 'title': str, 'scene': str, 'teaching': str }
+    model: str = "gpt-4o-2024-11-20",
+    temperature: float = 0.5,
+) -> Dict[str, List[str]]:
+    """
+    Sends one batch prompt for all panels, returns {panel_title: [role, ...], ...}
+    """
+    prompt_panels = []
+    for p in panels:
+        prompt_panels.append(
+            f"---\nPanel Title: {p['title']}\nScene Description:\n{p['scene']}\nTeaching Narrative:\n{p['teaching']}\n"
+        )
+    prompt = f"""
+You are a technical storyboard designer for a graphic novel that teaches SRE.
+For each panel below, suggest up to 4 character roles that should be visually present.
+Return a JSON dictionary: {{ "Panel Title 1": [roles...], ... }}
+{''.join(prompt_panels)}
+Respond ONLY with the JSON object.
+    """
+
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+    )
+    raw = response.choices[0].message.content.strip()
+    # Remove code fences if present
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+    try:
+        result = json.loads(raw)
+        # Ensure every value is a list of strings
+        return {
+            k: [v2 for v2 in v if isinstance(v2, str)]
+            for k, v in result.items()
+            if isinstance(v, list)
+        }
+    except Exception as e:
+        print("Failed to parse batch character roles:", e)
+        print("Raw:", raw)
+        return {}
+
+
 def handle_openai_response(response_content: str, section_title: str) -> str:
     """
     Process OpenAI response content and log any unexpected image markdown.

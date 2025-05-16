@@ -1,10 +1,10 @@
-# character_role_suggester.py
+# character_role_suggester.py (batch-optimized)
 
 from pathlib import Path
 from typing import Dict, List
 
 from MarkdownDocument import MarkdownDocument
-from openai_service import suggest_character_roles_from_context
+from openai_service import suggest_character_roles_for_panels
 
 
 class CharacterRoleSuggester:
@@ -15,20 +15,29 @@ class CharacterRoleSuggester:
         doc = MarkdownDocument()
         if not doc.load_and_process(str(md_path)):
             raise ValueError(f"Failed to load document from {md_path}.")
-        file_result = {}
+        panel_inputs = []
+        panel_titles = []
         for panel in doc.list_panels():
             sections = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
             scene = sections.get("Scene Description", "")
             teaching = sections.get("Teaching Narrative", "")
             if not scene and not teaching:
                 continue
-            roles = suggest_character_roles_from_context(
-                panel_title=panel.panel_title_text,
-                scene_description_md=scene,
-                teaching_narrative_md=teaching,
+            panel_inputs.append(
+                {
+                    "title": panel.panel_title_text,
+                    "scene": scene,
+                    "teaching": teaching,
+                }
             )
-            file_result[panel.panel_title_text] = roles
-        return {md_path.name: file_result}
+            panel_titles.append(panel.panel_title_text)
+        if not panel_inputs:
+            return {md_path.name: {}}
+        # Batch OpenAI call for all panels in the file
+        role_dict = suggest_character_roles_for_panels(panel_inputs)
+        return {
+            md_path.name: {title: role_dict.get(title, []) for title in panel_titles}
+        }
 
     @staticmethod
     def suggest_roles_for_folder(folder_path: str) -> Dict[str, Dict[str, List[str]]]:

@@ -14,3 +14,5 @@ src/__pycache__/app_controller.cpython-312.pyc
 src/__pycache__/document_model.cpython-312.pyc
 src/__pycache__/app_controller.cpython-312.pyc
 
+src/__pycache__/openai_service.cpython-312.pyc
+src/__pycache__/*
