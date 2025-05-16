@@ -17,6 +17,10 @@ from document_model import (
     render_blocks_to_markdown,
 )
 
+# Define constants at the top of the file
+PANEL_HEADING_PREFIX = "Panel "
+INITIAL_CONTENT_TITLE = "Initial Content"
+
 
 class MarkdownDocument:
     def __init__(self, filepath: Optional[str] = None):
@@ -113,7 +117,7 @@ class MarkdownDocument:
 
             if isinstance(block, Heading) and block.level == 2:
                 heading_text = get_heading_text(block)
-                if heading_text.startswith("Panel "):
+                if heading_text.startswith(PANEL_HEADING_PREFIX):
                     is_h2_panel_heading = True
                     panel_title_text = heading_text
                     panel_h2_block_node = block
@@ -150,7 +154,9 @@ class MarkdownDocument:
                         isinstance(next_block_in_panel, Heading)
                         and next_block_in_panel.level == 2
                     ):
-                        if get_heading_text(next_block_in_panel).startswith("Panel "):
+                        if get_heading_text(next_block_in_panel).startswith(
+                            PANEL_HEADING_PREFIX
+                        ):
                             is_next_block_another_panel_h2 = True
                     if is_next_block_another_panel_h2:
                         break
@@ -210,7 +216,7 @@ class MarkdownDocument:
     ) -> List[H3Pydantic]:
         h3_pydantic_list: List[H3Pydantic] = []
         current_h3_content_blocks_for_h4s: List[BlockToken] = []
-        active_h3_title = "Initial Content"
+        active_h3_title = INITIAL_CONTENT_TITLE
         active_h3_block_node: Optional[Heading] = None
         h3_counter_in_panel = 0
 
@@ -238,7 +244,7 @@ class MarkdownDocument:
 
             if is_h3_heading:
                 if active_h3_block_node or (
-                    active_h3_title == "Initial Content"
+                    active_h3_title == INITIAL_CONTENT_TITLE
                     and current_h3_content_blocks_for_h4s
                 ):
                     h3_counter_in_panel += 1
@@ -372,7 +378,7 @@ class MarkdownDocument:
 
             h3_pydantic_list.append(
                 H3Pydantic(
-                    heading_text="Initial Content",
+                    heading_text=INITIAL_CONTENT_TITLE,
                     mistletoe_h3_block=None,
                     initial_content_markdown=initial_md,
                     h4_sections=h4s,
