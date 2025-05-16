@@ -2,9 +2,9 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
-from document_model import MarkdownDocument
 from generate_character_profiles import generate_character_profiles_for_roles
 from logging_config import get_logger
+from MarkdownDocument import MarkdownDocument
 from openai_service import (
     generate_narration_title_for_panel,
     generate_speech_bubbles_for_panel,

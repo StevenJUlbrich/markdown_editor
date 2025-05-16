@@ -94,7 +94,7 @@ def debug_role_validation(json_path, md_path):
         print("\n---Running validation with detailed tracing---")
         try:
             # Modified version of validate_roles with extra debugging
-            from document_model import MarkdownDocument
+            from MarkdownDocument import MarkdownDocument
 
             validation_report = []
             for md_file in Path(md_path).glob("*.md"):

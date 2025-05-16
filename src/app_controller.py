@@ -1,11 +1,13 @@
 # app_controller.py
 from typing import Any, Dict, List, Optional
 
-# Assuming document_model.py, openai_service.py, diff_utils.py are in the same directory or PYTHONPATH
 import openai_service  # For OpenAI interactions
 from diff_utils import generate_text_diff
-from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
+from document_model import H3Pydantic, PanelPydantic
 from logging_config import setup_logging
+
+# Assuming document_model.py, openai_service.py, diff_utils.py are in the same directory or PYTHONPATH
+from MarkdownDocument import MarkdownDocument
 
 setup_logging()
 

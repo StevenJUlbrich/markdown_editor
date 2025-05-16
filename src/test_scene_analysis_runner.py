@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import List
 
 from comic_image_pipeline import process_panel_to_json
-from document_model import MarkdownDocument
 from generate_character_profiles import generate_character_profiles_for_roles
+from MarkdownDocument import MarkdownDocument
 
 CHARACTER_JSON_PATH = Path(
     "D:\Development_Personal\SRE-Training\SRE CORE PRACTICES\day 03\character\chapter_03_character_sheet.json"

@@ -8,8 +8,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Set, Union
 
-from document_model import MarkdownDocument, PanelPydantic
+from document_model import PanelPydantic
 from logging_config import get_logger
+from MarkdownDocument import MarkdownDocument
 from openai_service import suggest_character_roles_from_context
 
 logger = get_logger(__name__)
