@@ -65,11 +65,15 @@ class MarkdownDocument:
                 self.raw_content = f.read()
             logger.info(f"Successfully loaded '{self.filepath}'.")
         except FileNotFoundError:
-            logger.error(f"File not found at '{self.filepath}'")
+            logger.error(
+                f"File not found at '{self.filepath}'. Please check the file path and try again."
+            )
             self.raw_content = None
             return False
         except Exception as e:
-            logger.error(f"Error reading file '{self.filepath}': {e}")
+            logger.error(
+                f"Error reading file '{self.filepath}': {e}. Ensure the file is accessible and not corrupted."
+            )
             self.raw_content = None
             return False
 
@@ -77,10 +81,12 @@ class MarkdownDocument:
             self._parse_to_mistletoe_ast()
             self._build_pydantic_model()
             if not self.mistletoe_doc or not self.mistletoe_doc.children:
-                logger.warning("Document was loaded but Mistletoe AST is empty.")
+                logger.warning(
+                    "Document was loaded but Mistletoe AST is empty. Verify the content of the Markdown file."
+                )
             elif not self.chapter_model or not self.chapter_model.document_elements:
                 logger.warning(
-                    "Document parsed, but Pydantic chapter model is empty or has no elements."
+                    "Document parsed, but Pydantic chapter model is empty or has no elements. Check the document structure."
                 )
         return True
 
@@ -91,7 +97,9 @@ class MarkdownDocument:
 
     def _build_pydantic_model(self):
         if not self.mistletoe_doc or not self.mistletoe_doc.children:
-            logger.error("Mistletoe AST is empty, cannot build Pydantic model.")
+            logger.error(
+                "Mistletoe AST is empty, cannot build Pydantic model. Ensure the document is not empty or malformed."
+            )
             return
 
         doc_elements: List[Union[GenericContentPydantic, PanelPydantic]] = []
@@ -211,10 +219,12 @@ class MarkdownDocument:
             )
             if not self._validate_internal_ids():
                 logger.warning(
-                    "Internal ID validation failed after building Pydantic model. Structure may be inconsistent."
+                    "Internal ID validation failed after building Pydantic model. Structure may be inconsistent. Review the document for errors."
                 )
         else:
-            logger.error("Pydantic chapter model could not be built.")
+            logger.error(
+                "Pydantic chapter model could not be built. Verify the document content and structure."
+            )
 
     def _parse_h3_sections_from_panel_blocks(
         self, panel_content_blocks: List[BlockToken]
@@ -450,10 +460,9 @@ class MarkdownDocument:
         return initial_content_markdown_for_h3, h4_pydantic_list
 
     def _validate_internal_ids(self) -> bool:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             logger.error(
-                "VALIDATE_ID_ERROR: Chapter model not built. Cannot validate IDs."
+                "VALIDATE_ID_ERROR: Chapter model not built. Cannot validate IDs. Ensure the document was processed correctly."
             )
             return False
 
@@ -509,7 +518,6 @@ class MarkdownDocument:
         return is_valid
 
     def list_all_h2_sections(self) -> List[Dict[str, Any]]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             return []
         sections = []
@@ -541,7 +549,6 @@ class MarkdownDocument:
         return sections
 
     def list_panels(self) -> List[PanelPydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             return []
         return sorted(
@@ -554,7 +561,6 @@ class MarkdownDocument:
         )
 
     def get_panel_by_number(self, panel_doc_number: int) -> Optional[PanelPydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not self.chapter_model:
             return None
         for element in self.chapter_model.document_elements:
@@ -568,7 +574,6 @@ class MarkdownDocument:
     def get_h3_by_number(
         self, panel: PanelPydantic, h3_panel_number: int
     ) -> Optional[H3Pydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not panel:
             return None
         for h3_section in panel.h3_sections:
@@ -579,7 +584,6 @@ class MarkdownDocument:
     def get_h4_by_number(
         self, h3_section: H3Pydantic, h4_h3_number: int
     ) -> Optional[H4Pydantic]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not h3_section:
             return None
         for h4_section in h3_section.h4_sections:
@@ -588,7 +592,6 @@ class MarkdownDocument:
         return None
 
     def list_h3_sections_in_panel(self, panel: PanelPydantic) -> List[Dict[str, Any]]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not panel:
             return []
         return [
@@ -599,7 +602,6 @@ class MarkdownDocument:
     def list_targetable_sections_in_panel(
         self, panel: PanelPydantic
     ) -> List[Dict[str, Any]]:
-        # ... (same as document_model_targeted_enh_v1) ...
         if not panel:
             return []
         targets = []
@@ -660,9 +662,6 @@ class MarkdownDocument:
                 current_display_number += 1
         return targets
 
-    # --- Getters for Content ---
-    # ... (get_section_markdown_for_api, get_panel_full_markdown, get_h3_subsection_full_markdown,
-    #      get_h4_subsubsection_full_markdown remain the same as document_model_targeted_enh_v1)
     def get_section_markdown_for_api(
         self,
         panel_id: int,
@@ -756,7 +755,6 @@ class MarkdownDocument:
             )
         return render_blocks_to_markdown(h4_blocks_to_render, self.renderer)
 
-    # --- New Methods for Targeted Enhancement ---
     def extract_named_sections_from_panel(self, panel_id: int) -> Dict[str, str]:
         panel = self.get_panel_by_number(panel_id)
         if not panel:
@@ -872,10 +870,7 @@ class MarkdownDocument:
             return False
 
         if h3_id_in_panel is None:  # Updating H2 Panel (entire panel content)
-            # This part already re-parses H3s. Consider if new_markdown_content here also needs fence stripping.
-            # For now, focusing on the H3 update case as per the problem.
             logger.warning(f"Replacing entire content of Panel ID '{panel_id}'.")
-            # Potentially apply _strip_outer_markdown_fences to new_markdown_content here too if panels can be wrapped
             temp_doc_for_new_panel_content = Document(new_markdown_content)
             new_h3_sections = self._parse_h3_sections_from_panel_blocks(
                 list(temp_doc_for_new_panel_content.children)  # Ensure it's a list
@@ -892,8 +887,6 @@ class MarkdownDocument:
             return False
 
         if is_h3_initial_content_target:
-            # Initial content is usually smaller; direct assignment is often fine,
-            # but stripping could be applied here too if users paste fenced blocks.
             h3_section.initial_content_markdown = _strip_outer_markdown_fences(
                 new_markdown_content
             )
@@ -904,7 +897,6 @@ class MarkdownDocument:
             return True
 
         if h4_id_in_h3 is None:  # This means updating an entire H3 section's content
-            # Apply fence stripping to the incoming Markdown for the H3 section
             processed_h3_content = _strip_outer_markdown_fences(new_markdown_content)
 
             temp_doc_new_h3 = Document(processed_h3_content)
@@ -936,15 +928,12 @@ class MarkdownDocument:
             )
             return True
 
-        # H4 content update
         h4_section = self.get_h4_by_number(h3_section, h4_id_in_h3)
         if not h4_section:
             logger.error(
                 f"H4 ID '{h4_id_in_h3}' not found in H3 ID '{h3_id_in_panel}'."
             )
             return False
-        # H4 content is typically just paragraphs, lists, etc., not a full fenced block.
-        # But stripping could be added here if necessary.
         h4_section.content_markdown = _strip_outer_markdown_fences(new_markdown_content)
         h3_section.original_full_markdown = self._regenerate_h3_full_markdown(
             h3_section
@@ -1045,21 +1034,12 @@ class MarkdownDocument:
 
         return render_blocks_to_markdown(blocks_for_render, self.renderer)
 
-    # document_model.py
     def _sanitize_markdown(self, heading_text: str, markdown: str) -> str:
-        # Imports like `from mistletoe import Document` are typically at the module level.
-        # If `BlockCode` and `Heading` are only used here, their import can stay,
-        # but `MarkdownRenderer` import is not needed if using `self.renderer`.
-
         cleaned = markdown.strip()
         if cleaned.startswith("```markdown") or cleaned.startswith("```"):
             lines = cleaned.splitlines()
             if len(lines) > 2 and lines[0].startswith("```"):
                 cleaned = "\n".join(lines[1:-1]).strip()
-
-        # It's good practice to ensure Document is imported if not already at module top
-        # from mistletoe import Document (if not already globally available)
-        # from mistletoe.block_token import BlockCode, Heading (if not already globally)
 
         original_doc = Document(cleaned)
         lower_heading = heading_text.strip().lower()
@@ -1070,16 +1050,13 @@ class MarkdownDocument:
                 block_heading = get_heading_text(block).strip().lower()
                 if block_heading == lower_heading:
                     continue
-            if isinstance(block, BlockCode):  # Make sure BlockCode is imported
+            if isinstance(block, BlockCode):
                 continue
             filtered_blocks.append(block)
 
         new_doc = Document("")
         new_doc.children = filtered_blocks
 
-        # Use the class's shared renderer instance instead of creating a new one.
-        # No try/finally/close needed for the shared renderer here,
-        # as its lifecycle isn't tied to this specific call.
         rendered = self.renderer.render(new_doc)
 
         return rendered.strip()
@@ -1088,9 +1065,7 @@ class MarkdownDocument:
         if not self.chapter_model:
             return self.raw_content or ""
 
-        all_final_blocks: List[BlockToken] = (
-            []
-        )  # Ensure BlockToken is imported or defined
+        all_final_blocks: List[BlockToken] = []
 
         if self.chapter_model.mistletoe_h1_block:
             all_final_blocks.append(self.chapter_model.mistletoe_h1_block)
@@ -1104,7 +1079,7 @@ class MarkdownDocument:
                         if b is not None and isinstance(b, BlockToken)
                     )
                 elif element.content_markdown:
-                    generic_doc = Document(element.content_markdown)  # Original logic
+                    generic_doc = Document(element.content_markdown)
                     all_final_blocks.extend(
                         b
                         for b in generic_doc.children
@@ -1118,9 +1093,7 @@ class MarkdownDocument:
                     content_string_for_h3 = None
                     if h3_section.api_improved_markdown is not None:
                         content_string_for_h3 = h3_section.api_improved_markdown
-                    elif (
-                        h3_section.original_full_markdown
-                    ):  # Ensure this field exists and is the one to use
+                    elif h3_section.original_full_markdown:
                         content_string_for_h3 = h3_section.original_full_markdown
 
                     if content_string_for_h3:
