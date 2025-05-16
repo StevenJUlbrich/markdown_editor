@@ -6,7 +6,7 @@ import openai_service
 from base_batch_processor import BaseBatchProcessor
 from document_model import H3Pydantic, PanelPydantic
 from logging_config import get_logger
-from MarkdownDocument import MarkdownDocument
+from markdown_document import MarkdownDocument
 
 logger = get_logger(__name__)
 

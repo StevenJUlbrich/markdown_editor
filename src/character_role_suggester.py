@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Dict, List
 
-from MarkdownDocument import MarkdownDocument
+from markdown_document import MarkdownDocument
 from openai_service import suggest_character_roles_for_panels
 
 

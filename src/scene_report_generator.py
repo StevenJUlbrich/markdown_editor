@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 
 from document_model import PanelPydantic
-from MarkdownDocument import MarkdownDocument
+from markdown_document import MarkdownDocument
 from openai_service import generate_scene_analysis_from_ai
 
 
