@@ -24,6 +24,17 @@ def process_panel_to_json(
     chapter_prefix: str,
     images_folder: str,
 ) -> Optional[Dict]:
+    import json
+    from pathlib import Path
+
+    from openai_service import (
+        generate_narration_title_for_panel,
+        generate_scene_analysis_from_ai,
+        generate_speech_bubbles_for_panel,
+        infer_scene_tags_for_panel,
+        rewrite_scene_and_teaching_as_summary,
+    )
+
     panel_id = panel.panel_number_in_doc
     panel_title = panel.panel_title_text
 
@@ -35,18 +46,27 @@ def process_panel_to_json(
         logger.warning("Panel %s has no Scene or Teaching Narrative.", panel_title)
         return None
 
-    # Step 1: Suggest roles
-    suggested_roles = suggest_character_roles_from_context(
-        panel_title=panel_title,
-        scene_description_md=scene_md,
-        teaching_narrative_md=teaching_md,
-    )
+    # 🔹 STEP 1: Generate scene analysis and assign to panel
+    scene_analysis = generate_scene_analysis_from_ai(scene_md, teaching_md)
+    panel.scene_analysis = scene_analysis
 
-    # Step 2: Create missing characters
+    # 🔹 STEP 2: Resolve required roles from scene type
+    tag_to_roles = {
+        "Teaching Scene": ["Senior SRE", "Junior Developer", "Product Owner"],
+        "Chaos Scene": ["Support Engineer", "Angry Customer", "SRE Engineer"],
+        "Reflection Scene": ["Senior SRE", "Product Owner"],
+        "Meta Scene": ["Senior SRE"],
+    }
+    required_roles = set()
+    for tag in scene_analysis.scene_types:
+        required_roles.update(tag_to_roles.get(tag, []))
+    required_roles = list(required_roles)
+
+    # 🔹 STEP 3: Ensure required characters exist
     existing_roles = {
         c["role"] for c in character_data.get("characters", {}).values() if "role" in c
     }
-    new_roles = [r for r in suggested_roles if r not in existing_roles]
+    new_roles = [r for r in required_roles if r not in existing_roles]
     if new_roles:
         generate_character_profiles_for_roles(
             new_roles,
@@ -54,41 +74,39 @@ def process_panel_to_json(
             output_json_path=character_json_path,
             characters_per_role=characters_per_role,
         )
-        # Reload character file
         with open(character_json_path, "r", encoding="utf-8") as f:
             character_data = json.load(f)
 
-    # Step 3: Assign character names for roles
-    characters_in_frame = []
+    # 🔹 STEP 4: Assign characters to roles
+    role_to_character = {}
     used_names = set()
-    for role in suggested_roles:
+    for role in required_roles:
         candidates = [
             name
             for name, profile in character_data["characters"].items()
             if profile.get("role") == role and name not in used_names
         ]
         if candidates:
-            chosen = candidates[0]
-            characters_in_frame.append(chosen)
-            used_names.add(chosen)
+            selected = candidates[0]
+            role_to_character[role] = selected
+            used_names.add(selected)
 
-    # Step 4: Generate situational scene description
-    scene_summary = rewrite_scene_and_teaching_as_summary(scene_md, teaching_md)
-    scene_summary = scene_summary.strip()
+    characters_in_frame = list(role_to_character.values())
+
+    # 🔹 STEP 5: Generate scene summary
+    scene_summary = rewrite_scene_and_teaching_as_summary(scene_md, teaching_md).strip()
     if len(scene_summary) < 350:
         scene_summary += " (Expanded.)"
     elif len(scene_summary) > 750:
         scene_summary = scene_summary[:745] + "..."
 
-    # Step 5: Generate speech bubbles
+    # 🔹 STEP 6: Generate narration + speech bubbles
     speech_bubbles = generate_speech_bubbles_for_panel(
         scene_summary, characters_in_frame, character_data
     )
-
-    # Step 6: Generate narration
     narration = generate_narration_title_for_panel(scene_md, teaching_md)
 
-    # Step 7: Build filename
+    # 🔹 STEP 7: Update panel scene markdown
     safe_title = (
         panel_title.lower()
         .replace(" ", "-")
@@ -97,18 +115,19 @@ def process_panel_to_json(
         .replace(",", "")
     )
     filename = f"{chapter_prefix}_p{panel_id}_{safe_title}.png"
-
-    # Step 8: Update markdown
     image_markdown = f"![{panel_title}]({images_folder}/{filename})"
     updated_scene = f"{scene_summary}\n\n{image_markdown}"
     doc.update_named_section_in_panel(panel_id, "Scene Description", updated_scene)
 
-    # Step 9: Final JSON entry
+    # 🔹 STEP 8: Return panel metadata for JSON output
     return {
         "panel": panel_id,
         "filename": filename,
+        "scene_tags": scene_analysis.scene_types,
+        "scene_analysis": scene_analysis.model_dump(),  # ✅ updated here
         "scene_description": scene_summary,
         "characters_in_frame": characters_in_frame,
+        "character_roles": role_to_character,
         "speech_bubbles": speech_bubbles,
         "narration": narration,
     }
@@ -122,7 +141,14 @@ def process_chapter_for_visual_panels(
     images_folder: str = "images",
     characters_per_role: int = 2,
 ):
+
+    # Check if the input path is a file
+    if not chapter_md_path.is_file():
+        logger.error("❌ Input path is not a file: %s", chapter_md_path)
+        return
+
     doc = MarkdownDocument(filepath=str(chapter_md_path))
+
     if not doc.chapter_model:
         logger.error("❌ Failed to parse: %s", chapter_md_path.name)
         return
@@ -163,58 +189,69 @@ def process_chapter_for_visual_panels(
 def generate_image_prompt_from_panel(panel_json: Dict, character_data: Dict) -> str:
     """
     Constructs a detailed image generation prompt for a comic panel,
-    including scene summary and visual descriptions of each character.
+    using structured character-role mapping and scene tags.
 
     Args:
-        panel_json: One panel entry from chapter_images.json
+        panel_json: A single panel entry from chapter_image.json
         character_data: Full character JSON dictionary
 
     Returns:
-        A complete prompt string suitable for image generation
+        A formatted prompt string suitable for image generation
     """
-    summary = panel_json.get("summary", "").strip()
+    # Step 1: Extract scene summary
+    summary = panel_json.get("scene_description", "").strip()
     if not summary:
         return "Scene summary missing."
 
-    # Ensure minimum length
-    if len(summary) < 350:
-        summary = f"This scene should be more detailed: {summary}"
-    elif len(summary) > 750:
-        summary = summary[:745] + "..."
-
+    # Step 2: Determine characters and roles
     characters = panel_json.get("characters_in_frame", [])
+    role_map = panel_json.get("character_roles", {})
+
     character_descriptions = []
 
     for name in characters:
         profile = character_data.get("characters", {}).get(name, {})
         if not profile:
             continue
+
         role = profile.get("role", "Unknown role")
         visual_tags = profile.get("visual_tags", [])
         tag_desc = ", ".join(visual_tags)
-        character_descriptions.append(f"- {name}: {role}. Visual tags: {tag_desc}")
+        motion = profile.get("motion_rules", "neutral movement")
+        tone = profile.get("voice_tone", "neutral")
 
-    character_block = (
-        "\n".join(character_descriptions)
-        if character_descriptions
-        else "No character descriptions available."
-    )
+        character_descriptions.append(
+            f"- **{name}** ({role}): {tag_desc}\n  - Motion: {motion}\n  - Voice tone: {tone}"
+        )
 
-    # Final formatted image prompt
-    image_prompt = f"""
-Scene:
+    if not character_descriptions:
+        character_descriptions.append("No character descriptions available.")
+
+    scene_tags = panel_json.get("scene_tags", [])
+    scene_type_str = ", ".join(scene_tags) if scene_tags else "Unspecified scene type"
+
+    # Step 3: Build final prompt
+    prompt = f"""
+**Scene Type**: {scene_type_str}
+
+**Scene Summary**:
 {summary}
 
-Characters:
-{character_block}
+**Characters**:
+{chr(10).join(character_descriptions)}
 
-Style:
-Comic panel illustration, digital art, clean lines.
-Facial expressions should reflect emotion. The setting should be a realistic tech workspace.
-Make sure the scene reads clearly as a single moment in time.
-    """.strip()
+**Instructions**:
+- Create a comic panel illustration in clean digital style.
+- Use expressive body language and facial expressions to show the emotional tone.
+- Layout should reflect a single snapshot in time, clearly showing the tension or insight.
+- If the scene is a Teaching or Reflection scene, the Senior SRE (e.g., Hector or Juana) should appear calm, analytical, or observational.
+- If the scene is a Chaos scene, show action, tension, or confusion.
+- Background elements like terminals, dashboards, or conference tables should match the setting.
 
-    return image_prompt
+**Visual Style**:
+Modern comic panel, clean lines, expressive characters, detailed backgrounds.
+"""
+    return prompt.strip()
 
 
 def export_prompts_from_json(

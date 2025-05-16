@@ -1,7 +1,9 @@
+# enhanced_batch_processor.py
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
+from base_batch_processor import BaseBatchProcessor
 from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
 from logging_config import get_logger
 from openai_service import (
@@ -13,14 +15,21 @@ from openai_service import (
 logger = get_logger(__name__)
 
 
-class EnhancedBatchProcessor:
+class EnhancedBatchProcessor(BaseBatchProcessor):
     def __init__(self, dry_run: bool = False, max_workers: int = 3):
-        self.dry_run = dry_run
+        super().__init__(dry_run=dry_run)
         self.max_workers = max_workers
+        logger.info(
+            "EnhancedBatchProcessor initialized with %d worker threads",
+            self.max_workers,
+        )
 
     def process_panel_roles(
         self, doc: MarkdownDocument, panel: PanelPydantic
     ) -> List[str]:
+        """
+        Process character roles for a panel.
+        """
         section_map = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
         if not section_map:
             return []
@@ -40,25 +49,11 @@ class EnhancedBatchProcessor:
         )
         return roles
 
-    def process_roles_directory(self, input_folder: Path) -> None:
-        input_folder.mkdir(exist_ok=True)
-        all_files = list(input_folder.glob("*.md"))
-
-        for file_path in all_files:
-            logger.info("[Roles Only] Processing: %s", file_path.name)
-            doc = MarkdownDocument(filepath=str(file_path))
-            if not doc.chapter_model:
-                logger.warning(
-                    "[Roles Only] Skipping: Failed to load document model: %s",
-                    file_path.name,
-                )
-                continue
-
-            for panel in doc.chapter_model.document_elements:
-                if isinstance(panel, PanelPydantic):
-                    self.process_panel_roles(doc, panel)
-
     def process_panel(self, doc: MarkdownDocument, panel: PanelPydantic) -> int:
+        """
+        Enhanced panel processing with more streamlined logic.
+        """
+        # Get panel context and suggestions using shared base method
         section_map = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
         if not section_map:
             return 0
@@ -93,13 +88,14 @@ class EnhancedBatchProcessor:
                 enhancements += 1
         return enhancements
 
-    def process_file(self, filepath: Path, output_dir: Path) -> bool:
-        logger.info("Processing file: %s", filepath.name)
-        doc = MarkdownDocument(filepath=str(filepath))
-        if not doc.chapter_model:
-            logger.error("Failed to load document model: %s", filepath.name)
+    def process_single_file(self, filepath: Path, output_dir: Path) -> bool:
+        """
+        Process a single file - enhanced implementation.
+        """
+        if not super().process_single_file(filepath, output_dir):
             return False
 
+        doc = MarkdownDocument(filepath=str(filepath))
         updated_panels = 0
         for el in doc.chapter_model.document_elements:
             if isinstance(el, PanelPydantic):
@@ -117,14 +113,43 @@ class EnhancedBatchProcessor:
             logger.info("No enhancements applied to: %s", filepath.name)
             return True
 
-    def process_directory(self, input_folder: Path, output_folder: Path) -> None:
+    def process_roles_directory(self, input_folder: Union[str, Path]) -> None:
+        """
+        Process only the roles in a directory of markdown files.
+        """
+        input_folder = Path(input_folder)
         input_folder.mkdir(exist_ok=True)
-        output_folder.mkdir(exist_ok=True)
+        all_files = list(input_folder.glob("*.md"))
+
+        for file_path in all_files:
+            logger.info("[Roles Only] Processing: %s", file_path.name)
+            doc = MarkdownDocument(filepath=str(file_path))
+            if not doc.chapter_model:
+                logger.warning(
+                    "[Roles Only] Skipping: Failed to load document model: %s",
+                    file_path.name,
+                )
+                continue
+
+            for panel in doc.chapter_model.document_elements:
+                if isinstance(panel, PanelPydantic):
+                    self.process_panel_roles(doc, panel)
+
+    def process_directory(
+        self, input_folder: Union[str, Path], output_folder: Union[str, Path]
+    ) -> None:
+        """
+        Process all markdown files in a directory with multi-threading.
+        """
+        super().process_directory(input_folder, output_folder)
+
+        input_folder = Path(input_folder)
+        output_folder = Path(output_folder)
         all_files = list(input_folder.glob("*.md"))
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
-                executor.submit(self.process_file, f, output_folder): f
+                executor.submit(self.process_single_file, f, output_folder): f
                 for f in all_files
             }
             for future in as_completed(futures):
