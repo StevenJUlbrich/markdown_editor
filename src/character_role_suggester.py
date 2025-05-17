@@ -5,6 +5,7 @@ from typing import Dict, List
 
 from markdown_document import MarkdownDocument
 from openai_service import suggest_character_roles_for_panels
+from section_titles import SECTION_TITLES
 
 
 class CharacterRoleSuggester:
@@ -19,8 +20,8 @@ class CharacterRoleSuggester:
         panel_titles = []
         for panel in doc.list_panels():
             sections = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
-            scene = sections.get("Scene Description", "")
-            teaching = sections.get("Teaching Narrative", "")
+            scene = sections.get(SECTION_TITLES.SCENE_DESCRIPTION.value, "")
+            teaching = sections.get(SECTION_TITLES.TEACHING_NARRATIVE.value, "")
             if not scene and not teaching:
                 continue
             panel_inputs.append(

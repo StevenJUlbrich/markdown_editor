@@ -12,6 +12,7 @@ from document_model import PanelPydantic
 from logging_config import get_logger
 from markdown_document import MarkdownDocument
 from openai_service import suggest_character_roles_from_context
+from section_titles import SECTION_TITLES
 
 logger = get_logger(__name__)
 
@@ -71,8 +72,8 @@ def extract_roles_per_panel(doc: MarkdownDocument) -> Dict[str, List[str]]:
             section_map = doc.extract_named_sections_from_panel(
                 element.panel_number_in_doc
             )
-            scene = section_map.get("Scene Description", "")
-            teaching = section_map.get("Teaching Narrative", "")
+            scene = section_map.get(SECTION_TITLES.SCENE_DESCRIPTION.value, "")
+            teaching = section_map.get(SECTION_TITLES.TEACHING_NARRATIVE.value, "")
 
             if scene.strip() or teaching.strip():
                 # Get roles from OpenAI service

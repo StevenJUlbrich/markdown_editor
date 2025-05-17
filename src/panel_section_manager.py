@@ -4,6 +4,9 @@ import logging
 from typing import Dict, Optional
 
 from document_model import H3Pydantic, PanelPydantic
+from section_titles import (
+    SECTION_TITLES,
+)  # Assuming this is a module with section titles
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +17,7 @@ class PanelSectionManager:
     Does not directly parse markdown or handle files.
     """
 
-    KNOWN_SECTION_TITLES = [
-        "Scene Description",
-        "Teaching Narrative",
-        "Common Example of the Problem",
-        "SRE Best Practice: Evidence-Based Investigation",
-        "Banking Impact",
-        "Implementation Guidance",
-    ]
+    KNOWN_SECTION_TITLES = [s.value for s in SECTION_TITLES]
 
     @staticmethod
     def extract_named_sections(panel: PanelPydantic) -> Dict[str, str]:

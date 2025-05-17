@@ -12,6 +12,9 @@ from openai_service import (
     get_improved_markdown_for_section,
     suggest_character_roles_from_context,
 )
+from section_titles import (
+    SECTION_TITLES,
+)  # Assuming this is a module with section titles
 
 logger = get_logger(__name__)
 
@@ -60,7 +63,10 @@ class EnhancedBatchProcessor(BaseBatchProcessor):
             return 0
 
         context_parts = [f"## {panel.panel_title_text}"]
-        for section in ["Scene Description", "Teaching Narrative"]:
+        for section in [
+            SECTION_TITLES.SCENE_DESCRIPTION.value,
+            SECTION_TITLES.TEACHING_NARRATIVE.value,
+        ]:
             if section_map.get(section):
                 context_parts.append(section_map[section])
         context = "\n\n".join(context_parts)
