@@ -6,7 +6,7 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-from document_model import SceneAnalysisPydantic
+from models.document_model import SceneAnalysisPydantic
 from logging_config import get_logger
 from utils import (
     clean_and_flatten_roles,

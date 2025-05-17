@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Union
 
 from batch_processing.base_batch_processor import BaseBatchProcessor
-from document_model import H3Pydantic, PanelPydantic
+from models.document_model import H3Pydantic, PanelPydantic
 from logging_config import get_logger
 from markdown_document import MarkdownDocument
 from openai_service import (
@@ -12,7 +12,7 @@ from openai_service import (
     get_improved_markdown_for_section,
     suggest_character_roles_from_context,
 )
-from section_titles import (
+from models.section_titles import (
     SECTION_TITLES,
 )  # Assuming this is a module with section titles
 

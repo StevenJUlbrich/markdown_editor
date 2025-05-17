@@ -11,7 +11,7 @@ from openai_service import (
     rewrite_scene_and_teaching_as_summary,
     suggest_character_roles_from_context,
 )
-from section_titles import SECTION_TITLES
+from models.section_titles import SECTION_TITLES
 
 logger = get_logger(__name__)
 

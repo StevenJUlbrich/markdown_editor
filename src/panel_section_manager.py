@@ -3,8 +3,8 @@
 import logging
 from typing import Dict, Optional
 
-from document_model import H3Pydantic, PanelPydantic
-from section_titles import (
+from models.document_model import H3Pydantic, PanelPydantic
+from models.section_titles import (
     SECTION_TITLES,
 )  # Assuming this is a module with section titles
 
@@ -80,7 +80,10 @@ class PanelSectionManager:
         from mistletoe import Document
         from mistletoe.block_token import BlockCode, BlockToken, Heading
 
-        from document_model import get_heading_text, render_blocks_to_markdown
+        from models.document_model import (
+            get_heading_text,
+            render_blocks_to_markdown,
+        )
 
         original_doc = Document(cleaned)
         lower_heading = heading_text.strip().lower()

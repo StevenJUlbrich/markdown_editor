@@ -3,7 +3,12 @@
 import logging
 from typing import Any, Set
 
-from document_model import ChapterPydantic, H3Pydantic, H4Pydantic, PanelPydantic
+from models.document_model import (
+    ChapterPydantic,
+    H3Pydantic,
+    H4Pydantic,
+    PanelPydantic,
+)
 
 logger = logging.getLogger(__name__)
 

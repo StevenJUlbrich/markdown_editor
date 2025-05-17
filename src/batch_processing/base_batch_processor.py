@@ -2,10 +2,10 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Union
 
-from document_model import H3Pydantic, PanelPydantic
+from models.document_model import H3Pydantic, PanelPydantic
 from logging_config import get_logger
 from markdown_document import MarkdownDocument
-from section_titles import SECTION_TITLES, normalize_section_name
+from models.section_titles import SECTION_TITLES, normalize_section_name
 
 logger = get_logger(__name__)
 

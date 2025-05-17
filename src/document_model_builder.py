@@ -6,7 +6,7 @@ from typing import Any, List, Optional, Union
 from mistletoe import Document
 from mistletoe.block_token import BlockToken, Heading
 
-from document_model import (
+from models.document_model import (
     _MODULE_LEVEL_RENDERER_INSTANCE,
     ChapterPydantic,
     H3Pydantic,
@@ -70,7 +70,7 @@ class DocumentModelBuilder:
                     generic_md = render_blocks_to_markdown(
                         current_generic_blocks, _MODULE_LEVEL_RENDERER_INSTANCE
                     )
-                    from document_model import (
+                    from models.document_model import (
                         GenericContentPydantic,
                     )  # avoid circular import
 
@@ -119,7 +119,7 @@ class DocumentModelBuilder:
             generic_md = render_blocks_to_markdown(
                 current_generic_blocks, _MODULE_LEVEL_RENDERER_INSTANCE
             )
-            from document_model import GenericContentPydantic
+            from models.document_model import GenericContentPydantic
 
             doc_elements.append(
                 GenericContentPydantic(

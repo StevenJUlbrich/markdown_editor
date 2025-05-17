@@ -3,7 +3,7 @@ import os
 sys.path.insert(0, os.path.abspath('src'))
 
 from src.panel_section_manager import PanelSectionManager
-from document_model import PanelPydantic, H3Pydantic
+from models.document_model import PanelPydantic, H3Pydantic
 
 
 def make_panel():
