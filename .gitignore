@@ -35,3 +35,7 @@ src/parsing/__pycache__/markdown_parser.cpython-312.pyc
 src/parsing/__pycache__/panel_section_manager.cpython-312.pyc
 src/parsing/__pycache__/document_validator.cpython-312.pyc
 src/__pycache__/app_controller.cpython-312.pyc
+src/services/__pycache__/__init__.cpython-312.pyc
+src/services/__pycache__/character_role_suggester.cpython-312.pyc
+src/services/__pycache__/utils.cpython-312.pyc
+src/services/__pycache__/openai_service.cpython-312.pyc
