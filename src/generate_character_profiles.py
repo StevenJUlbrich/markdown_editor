@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from openai import APIError, OpenAI, OpenAIError, RateLimitError
 
 from logging_config import get_logger
+from utils import clean_and_flatten_roles, generate_prompt, parse_response_with_retry
 
 client = OpenAI()
 logger = get_logger(__name__)
@@ -81,35 +82,6 @@ def parse_response_with_retry(
                 time.sleep(delay)
                 logger.info("Retrying...")
     raise ValueError("Failed to parse OpenAI response after retries.")
-
-
-def clean_and_flatten_roles(roles: List[Any]) -> List[str]:
-    """
-    Recursively flattens any nested lists and ensures only string roles are returned.
-
-    Args:
-        roles: A list that may contain strings, lists, or other types
-
-    Returns:
-        A flattened list containing only string values
-    """
-    cleaned = []
-
-    def flatten(item):
-        if isinstance(item, str):
-            cleaned.append(item)
-        elif isinstance(item, list):
-            for subitem in item:
-                flatten(subitem)
-        else:
-            logger.debug(
-                f"Skipping invalid role entry: {item} (type: {type(item).__name__})"
-            )
-
-    for r in roles:
-        flatten(r)
-
-    return cleaned
 
 
 def generate_character_profiles_for_roles(

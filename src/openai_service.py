@@ -8,6 +8,11 @@ from typing import Any, Dict, List, Optional
 
 from document_model import SceneAnalysisPydantic
 from logging_config import get_logger
+from utils import (
+    clean_and_flatten_roles,
+    clean_json_list_from_response,
+    strip_markdown_fences,
+)
 
 logger = get_logger(__name__)
 
@@ -72,8 +77,8 @@ Respond ONLY with the JSON object.
                 temperature=temperature,
             )
             raw = response.choices[0].message.content.strip()
-            if raw.startswith("```"):
-                raw = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw, flags=re.IGNORECASE)
+            raw = strip_markdown_fences(raw)
+
             result = json.loads(raw)
             return {
                 k: [v2 for v2 in v if isinstance(v2, str)]
@@ -276,22 +281,6 @@ Please provide an improved version of this H3 sub-section.
     except Exception as e:
         logger.exception("Unexpected error during content enhancement: %s", str(e))
         return None
-
-
-def strip_markdown_fences(markdown_content: str) -> str:
-    if not markdown_content:
-        return markdown_content
-    cleaned = markdown_content.strip()
-    lines = cleaned.splitlines()
-    if (
-        len(lines) >= 2
-        and lines[0].strip().startswith("```markdown")
-        and lines[-1].strip() == "```"
-    ):
-        cleaned = "\n".join(lines[1:-1]).strip()
-        if cleaned.startswith("```"):
-            return strip_markdown_fences(cleaned)
-    return cleaned
 
 
 def rewrite_scene_and_teaching_as_summary(
