@@ -1,5 +1,3 @@
-# comic_panel_image_sheet.py
-
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
