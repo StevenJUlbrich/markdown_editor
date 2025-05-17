@@ -5,7 +5,7 @@ from typing import Dict, List
 
 from markdown_document import MarkdownDocument
 from openai_service import suggest_character_roles_for_panels
-from section_titles import SECTION_TITLES
+from models.section_titles import SECTION_TITLES
 
 
 class CharacterRoleSuggester:
