@@ -11,11 +11,11 @@ from models.document_model import (
     PanelPydantic,
     render_blocks_to_markdown,
 )
-from document_model_builder import DocumentModelBuilder
-from document_validator import DocumentValidator
+from parsing.document_model_builder import DocumentModelBuilder
+from parsing.document_validator import DocumentValidator
 from markdown_file_manager import MarkdownFileManager
-from markdown_parser import MarkdownParser
-from panel_section_manager import PanelSectionManager
+from parsing.markdown_parser import MarkdownParser
+from parsing.panel_section_manager import PanelSectionManager
 
 logger = logging.getLogger(__name__)
 

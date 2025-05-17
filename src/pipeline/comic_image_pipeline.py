@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 from generate_character_profiles import generate_character_profiles_for_roles
 from logging_config import get_logger
-from markdown_document import MarkdownDocument
+from parsing.markdown_document import MarkdownDocument
 from openai_service import (
     generate_narration_title_for_panel,
     generate_speech_bubbles_for_panel,
