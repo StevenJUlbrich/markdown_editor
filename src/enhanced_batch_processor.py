@@ -4,13 +4,17 @@ from pathlib import Path
 from typing import List, Union
 
 from base_batch_processor import BaseBatchProcessor
-from document_model import H3Pydantic, MarkdownDocument, PanelPydantic
+from document_model import H3Pydantic, PanelPydantic
 from logging_config import get_logger
+from markdown_document import MarkdownDocument
 from openai_service import (
     get_enhancement_suggestions_for_panel_h3s,
     get_improved_markdown_for_section,
     suggest_character_roles_from_context,
 )
+from section_titles import (
+    SECTION_TITLES,
+)  # Assuming this is a module with section titles
 
 logger = get_logger(__name__)
 
@@ -59,7 +63,10 @@ class EnhancedBatchProcessor(BaseBatchProcessor):
             return 0
 
         context_parts = [f"## {panel.panel_title_text}"]
-        for section in ["Scene Description", "Teaching Narrative"]:
+        for section in [
+            SECTION_TITLES.SCENE_DESCRIPTION.value,
+            SECTION_TITLES.TEACHING_NARRATIVE.value,
+        ]:
             if section_map.get(section):
                 context_parts.append(section_map[section])
         context = "\n\n".join(context_parts)

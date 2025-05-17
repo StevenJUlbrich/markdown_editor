@@ -2,15 +2,16 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
-from document_model import MarkdownDocument
 from generate_character_profiles import generate_character_profiles_for_roles
 from logging_config import get_logger
+from markdown_document import MarkdownDocument
 from openai_service import (
     generate_narration_title_for_panel,
     generate_speech_bubbles_for_panel,
     rewrite_scene_and_teaching_as_summary,
     suggest_character_roles_from_context,
 )
+from section_titles import SECTION_TITLES
 
 logger = get_logger(__name__)
 
@@ -39,8 +40,8 @@ def process_panel_to_json(
     panel_title = panel.panel_title_text
 
     sections = doc.extract_named_sections_from_panel(panel_id)
-    scene_md = sections.get("Scene Description", "")
-    teaching_md = sections.get("Teaching Narrative", "")
+    scene_md = sections.get(SECTION_TITLES.SCENE_DESCRIPTION.value, "")
+    teaching_md = sections.get(SECTION_TITLES.TEACHING_NARRATIVE.value, "")
 
     if not scene_md.strip() and not teaching_md.strip():
         logger.warning("Panel %s has no Scene or Teaching Narrative.", panel_title)
