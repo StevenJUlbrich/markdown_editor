@@ -9,3 +9,7 @@ class SectionTitles(Enum):
     BANKING_IMPACT = "Banking Impact"
     IMPLEMENTATION_GUIDANCE = "Implementation Guidance"
     # Add more as needed
+
+
+# Alias used across the codebase for convenience
+SECTION_TITLES = SectionTitles
