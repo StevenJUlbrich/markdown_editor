@@ -127,6 +127,8 @@ def get_enhancement_suggestions_for_panel_h3s(
         h3_sections_text_for_prompt.append(
             f"## {h3_title}\n{content_without_heading if content_without_heading.strip() else 'This section appears to have no primary content following its heading.'}"
         )
+    separator = "\n\n---\n\n"
+    joined_sections = separator.join(h3_sections_text_for_prompt)
     prompt = f"""You are a senior SRE and technical learning designer.
 You are reviewing H3 sub-sections within a larger document panel titled: "{panel_title}"
 
@@ -139,7 +141,7 @@ Evaluate the following H3 sub-sections from this panel. For each one, determine 
 
 H3 Sub-sections to Evaluate:
 ---
-{ "\n\n---\n\n".join(h3_sections_text_for_prompt) }
+{joined_sections}
 ---
 
 For each H3 sub-section evaluated (use its exact title as the key, e.g., "Scene Description", "Common Example of the Problem"), provide your assessment in the following JSON format:
