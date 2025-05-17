@@ -1,12 +1,12 @@
 # document_model.py
 from typing import Any, Dict, List, Optional, Union
 
+from pydantic import BaseModel, Field
+
+from logging_config import get_logger, setup_logging
 from mistletoe import Document
 from mistletoe.block_token import BlockToken, Heading
 from mistletoe.markdown_renderer import MarkdownRenderer
-from pydantic import BaseModel, Field
-
-from logging_config import setup_logging, get_logger
 
 setup_logging()
 logger = get_logger(__name__)
@@ -39,12 +39,12 @@ def _strip_outer_markdown_fences(markdown_text: str) -> str:
 
 # --- Helper Function ---
 def get_heading_text(heading_node: Heading) -> str:
-    text = ""
-    if hasattr(heading_node, "children"):
-        for child in heading_node.children:
-            if hasattr(child, "content"):
-                text += child.content
-    return text.strip()
+    """Extracts all plain text from a Heading node, ignoring nested formatting."""
+    if not hasattr(heading_node, "children"):
+        return ""
+    return "".join(
+        getattr(child, "content", "") for child in heading_node.children
+    ).strip()
 
 
 def render_blocks_to_markdown(
@@ -72,9 +72,7 @@ try:
         "Module-level MarkdownRenderer instantiated successfully during import of document_model."
     )
 except Exception as e:
-    logger.critical(
-        "Could not instantiate module-level MarkdownRenderer: %s", e
-    )
+    logger.critical("Could not instantiate module-level MarkdownRenderer: %s", e)
     logger.critical("Further Mistletoe operations will likely fail.")
 
 
