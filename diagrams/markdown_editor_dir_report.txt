@@ -1,0 +1,77 @@
+src/
+├── __pycache__/
+│   ├── MarkdownDocument.cpython-312.pyc
+│   ├── app_controller.cpython-312.pyc
+│   ├── base_batch_processor.cpython-312.pyc
+│   ├── batch_processor.cpython-312.pyc
+│   ├── character_role_suggester.cpython-312.pyc
+│   ├── comic_image_pipeline.cpython-312.pyc
+│   ├── config.cpython-312.pyc
+│   ├── diff_utils.cpython-312.pyc
+│   ├── document_model_builder.cpython-312.pyc
+│   ├── document_validator.cpython-312.pyc
+│   ├── enhanced_batch_processor.cpython-312.pyc
+│   ├── generate_character_profiles.cpython-312.pyc
+│   ├── logging_config.cpython-312.pyc
+│   ├── markdown_document.cpython-312.pyc
+│   ├── markdown_file_manager.cpython-312.pyc
+│   ├── markdown_parser.cpython-312.pyc
+│   ├── models.cpython-312.pyc
+│   ├── panel_section_manager.cpython-312.pyc
+│   ├── role_validator_tool.cpython-312.pyc
+│   ├── section_titles.cpython-312.pyc
+│   ├── suggest_character_roles.cpython-312.pyc
+│   └── utils.cpython-312.pyc
+├── batch_processing/
+│   ├── __init__.py
+│   ├── base_batch_processor.py
+│   ├── batch_processor.py
+│   └── enhanced_batch_processor.py
+├── models/
+│   ├── __pycache__/
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── document_model.cpython-312.pyc
+│   │   └── section_titles.cpython-312.pyc
+│   ├── __init__.py
+│   ├── comic_panel_image_sheet.py
+│   ├── document_model.py
+│   └── section_titles.py
+├── parsing/
+│   ├── __pycache__/
+│   │   ├── document_model_builder.cpython-312.pyc
+│   │   ├── document_validator.cpython-312.pyc
+│   │   ├── markdown_document.cpython-312.pyc
+│   │   ├── markdown_parser.cpython-312.pyc
+│   │   └── panel_section_manager.cpython-312.pyc
+│   ├── __init___.py
+│   ├── document_model_builder.py
+│   ├── document_validator.py
+│   ├── markdown_document.py
+│   ├── markdown_file_manager.py
+│   ├── markdown_parser.py
+│   └── panel_section_manager.py
+├── pipeline/
+│   ├── __init__.py
+│   └── comic_image_pipeline.py
+├── services/
+│   ├── __pycache__/
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── character_role_suggester.cpython-312.pyc
+│   │   ├── openai_service.cpython-312.pyc
+│   │   └── utils.cpython-312.pyc
+│   ├── __init__.py
+│   ├── character_role_suggester.py
+│   ├── generate_character_profiles.py
+│   ├── openai_service.py
+│   ├── suggest_character_roles.py
+│   └── utils.py
+├── app_controller.py
+├── config.py
+├── diff_utils.py
+├── document.py
+├── export_chapter_scene_report.py
+├── fix_role_validator.py
+├── logging_config.py
+├── main.py
+├── role_validator_tool.py
+└── scene_report_generator.py
