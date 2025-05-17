@@ -1,5 +1,8 @@
 import json
 import re
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def flatten_list(data):
@@ -35,8 +38,8 @@ def clean_json_list_from_response(raw):
             # Try to flatten if list-of-lists
             return flatten_list(parsed)
     except Exception as e:
-        print("Warning: Failed to parse JSON response:", e)
-        print("Raw response was:", raw)
+        logger.warning("Failed to parse JSON response: %s", e)
+        logger.debug("Raw response was: %s", raw)
         return []
 
 

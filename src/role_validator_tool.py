@@ -193,7 +193,7 @@ def validate_roles(
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print(
+        logger.error(
             "Usage: python role_validator_tool.py <character_json> <markdown_directory>"
         )
         sys.exit(1)
@@ -202,16 +202,19 @@ if __name__ == "__main__":
     markdown_directory = Path(sys.argv[2])
 
     if not character_json.exists():
-        print(f"Character JSON not found: {character_json}")
+        logger.error("Character JSON not found: %s", character_json)
         sys.exit(1)
     if not markdown_directory.exists() or not markdown_directory.is_dir():
-        print(f"Markdown directory not found or invalid: {markdown_directory}")
+        logger.error("Markdown directory not found or invalid: %s", markdown_directory)
         sys.exit(1)
 
     report = validate_roles(character_json, markdown_directory)
-    print("\n=== MISSING ROLE SUMMARY ===")
+    logger.info("\n=== MISSING ROLE SUMMARY ===")
     for entry in report:
-        print(
-            f"- {entry['file']} | Panel: {entry['panel']} | Missing: {entry['missing_roles']}"
+        logger.info(
+            "- %s | Panel: %s | Missing: %s",
+            entry['file'],
+            entry['panel'],
+            entry['missing_roles'],
         )
-    print(f"\n✅ Completed: {len(report)} panel(s) with missing roles found.")
+    logger.info("\n✅ Completed: %d panel(s) with missing roles found.", len(report))

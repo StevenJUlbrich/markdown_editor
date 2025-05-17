@@ -1,5 +1,8 @@
 import json
 from pathlib import Path
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def export_chapter_scene_report(panel_json_path: Path, output_md_path: Path):
@@ -8,7 +11,7 @@ def export_chapter_scene_report(panel_json_path: Path, output_md_path: Path):
 
     panels = data.get("panels", [])
     if not panels:
-        print("⚠️ No panels found in the input JSON.")
+        logger.warning("No panels found in the input JSON.")
         return
 
     lines = ["# 📘 Scene Analysis Report\n"]
@@ -30,7 +33,7 @@ def export_chapter_scene_report(panel_json_path: Path, output_md_path: Path):
         lines.append("\n---\n")
 
     output_md_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"✅ Scene report saved to {output_md_path}")
+    logger.info("Scene report saved to %s", output_md_path)
 
 
 # Example usage

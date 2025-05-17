@@ -41,10 +41,10 @@ else:
         client = OpenAI()
     except ImportError:
         client = None
-        print("ERROR: OpenAI library not installed.")
+        logger.error("OpenAI library not installed.")
     except Exception as e:
         client = None
-        print(f"ERROR: Could not initialize OpenAI client: {e}")
+        logger.exception("Could not initialize OpenAI client: %s", e)
 
 
 # --- BATCHED ROLE SUGGESTION FUNCTION ---
@@ -87,8 +87,8 @@ Respond ONLY with the JSON object.
             }
         except Exception as e:
             if attempt == max_attempts - 1:
-                print("Failed to parse batch character roles:", e)
-                print("Raw:", raw)
+                logger.error("Failed to parse batch character roles: %s", e)
+                logger.debug("Raw: %s", raw)
                 return {}
             time.sleep(2**attempt)
 
@@ -160,7 +160,7 @@ Ensure your entire response is a single, valid JSON object. Do not add any expla
         )
         raw_response_content = response.choices[0].message.content
         if not raw_response_content:
-            print("[OpenAI Service] ERROR: Received empty response for suggestions.")
+            logger.error("Received empty response for suggestions.")
             return {}
         cleaned_response = raw_response_content.strip()
         if cleaned_response.startswith("```json"):
@@ -181,19 +181,19 @@ Ensure your entire response is a single, valid JSON object. Do not add any expla
                     "reason": details.get("reason"),
                 }
             else:
-                print(
-                    f"[OpenAI Service] WARNING: Unexpected format for suggestion details for '{title_key}': {details}"
+                logger.warning(
+                    "Unexpected format for suggestion details for '%s': %s",
+                    title_key,
+                    details,
                 )
         return parsed_suggestions
     except json.JSONDecodeError as e:
-        print(
-            f"[OpenAI Service] ERROR: Error decoding JSON response for suggestions: {e}"
-        )
-        print(f"Raw response was:\n>>>\n{raw_response_content}\n<<<")
+        logger.error("Error decoding JSON response for suggestions: %s", e)
+        logger.debug("Raw response was:\n>>>\n%s\n<<<", raw_response_content)
         return {}
     except Exception as e:
-        print(
-            f"[OpenAI Service] ERROR: Unexpected error getting suggestions: {type(e).__name__} - {e}"
+        logger.exception(
+            "Unexpected error getting suggestions: %s", e
         )
         return {}
 
@@ -489,11 +489,11 @@ Return only a JSON array like this:
             for item in parsed:
                 extract_strings(item)
         else:
-            print("Warning: OpenAI response was not a list:", parsed)
+            logger.warning("OpenAI response was not a list: %s", parsed)
         return flattened
     except Exception as e:
-        print("Failed to parse character role list from OpenAI:", e)
-        print("Raw response was:", raw)
+        logger.error("Failed to parse character role list from OpenAI: %s", e)
+        logger.debug("Raw response was: %s", raw)
         return []
 
 
@@ -583,8 +583,10 @@ Respond with ONLY a single valid JSON object. Do not wrap in markdown fences. No
             inferred_by_ai=True,
         )
     except Exception as e:
-        print("❌ Error during scene analysis generation:", e)
-        print("Raw response:", content if "content" in locals() else "None")
+        logger.error("Error during scene analysis generation: %s", e)
+        logger.debug(
+            "Raw response: %s", content if "content" in locals() else "None"
+        )
         return SceneAnalysisPydantic(
             scene_types=["Teaching Scene"],
             inferred_by_ai=True,
