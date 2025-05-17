@@ -38,8 +38,8 @@ class EnhancedBatchProcessor(BaseBatchProcessor):
         if not section_map:
             return []
 
-        scene_md = section_map.get("Scene Description", "")
-        teaching_md = section_map.get("Teaching Narrative", "")
+        scene_md = section_map.get(SECTION_TITLES.SCENE_DESCRIPTION.value, "")
+        teaching_md = section_map.get(SECTION_TITLES.TEACHING_NARRATIVE.value, "")
 
         roles = suggest_character_roles_from_context(
             panel_title=panel.panel_title_text,

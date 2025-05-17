@@ -5,6 +5,7 @@ from typing import Dict, List, Optional, Set, Union
 from document_model import H3Pydantic, PanelPydantic
 from logging_config import get_logger
 from markdown_document import MarkdownDocument
+from section_titles import SECTION_TITLES, normalize_section_name
 
 logger = get_logger(__name__)
 
@@ -69,7 +70,10 @@ class BaseBatchProcessor:
 
         # Build panel context from available sections
         context_parts = [f"## {panel.panel_title_text}"]
-        for section in ["Scene Description", "Teaching Narrative"]:
+        for section in [
+            SECTION_TITLES.SCENE_DESCRIPTION.value,
+            SECTION_TITLES.TEACHING_NARRATIVE.value,
+        ]:
             if section_map.get(section):
                 context_parts.append(section_map[section])
         panel_context = "\n\n".join(context_parts)
