@@ -1,11 +1,3 @@
-"""
-Comic Panel Image Sheet Models and Helpers
-
-This module defines the Pydantic models and utility functions for representing,
-generating, and exporting comic panel image sheet data, including support for
-multiple variants per panel for A/B evaluation and metadata for out-of-frame speakers.
-"""
-
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
