@@ -60,7 +60,7 @@ class BaseBatchProcessor:
             panel: The panel to process
 
         Returns:
-            Number of enhancements applied
+            Mapping of section titles to enhancement suggestions
         """
         section_map = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
         if not section_map:

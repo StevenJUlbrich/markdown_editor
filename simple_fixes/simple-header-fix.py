@@ -28,7 +28,7 @@ def process_file(file_path):
     with open(file_path, "w", encoding="utf-8") as f:
         f.writelines(updated_lines)
 
-    print(f"✔️ Updated: {file_path}")
+    print(f"✔ {file_path}")
 
 
 def process_folder(folder_path):
