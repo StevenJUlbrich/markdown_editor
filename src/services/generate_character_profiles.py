@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from openai import APIError, OpenAI, OpenAIError, RateLimitError
 
 from logging_config import get_logger
-from utils import clean_and_flatten_roles, generate_prompt, parse_response_with_retry
+from .utils import clean_and_flatten_roles
 
 client = OpenAI()
 logger = get_logger(__name__)

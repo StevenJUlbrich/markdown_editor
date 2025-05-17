@@ -26,7 +26,7 @@ def fix_role_validation(
     character_json_path: str, markdown_dir_path: str, per_role: int = 2
 ):
     """Fixed version of the role validation function"""
-    from generate_character_profiles import generate_character_profiles_for_roles
+    from services.generate_character_profiles import generate_character_profiles_for_roles
     from role_validator_tool import validate_roles
 
     char_path = Path(character_json_path)

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 
 from models.document_model import SceneAnalysisPydantic
 from logging_config import get_logger
-from utils import (
+from .utils import (
     clean_and_flatten_roles,
     clean_json_list_from_response,
     strip_markdown_fences,

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, List
 
 from parsing.markdown_document import MarkdownDocument
-from openai_service import suggest_character_roles_for_panels
+from .openai_service import suggest_character_roles_for_panels
 from models.section_titles import SECTION_TITLES
 
 

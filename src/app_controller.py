@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from character_role_suggester import CharacterRoleSuggester
+from services.character_role_suggester import CharacterRoleSuggester
 from parsing.markdown_document import MarkdownDocument
 
 logger = logging.getLogger(__name__)

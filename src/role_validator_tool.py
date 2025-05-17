@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Set, Union
 from models.document_model import PanelPydantic
 from logging_config import get_logger
 from parsing.markdown_document import MarkdownDocument
-from openai_service import suggest_character_roles_from_context
+from services.openai_service import suggest_character_roles_from_context
 from models.section_titles import SECTION_TITLES
 
 logger = get_logger(__name__)
