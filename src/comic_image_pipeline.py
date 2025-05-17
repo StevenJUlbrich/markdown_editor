@@ -271,4 +271,4 @@ def export_prompts_from_json(
     with open(output_txt_path, "w", encoding="utf-8") as outf:
         outf.write("\n\n".join(prompts))
 
-    print(f"✅ Exported {len(prompts)} prompts to {output_txt_path}")
+    logger.info("Exported %d prompts to %s", len(prompts), output_txt_path)

@@ -1,16 +1,18 @@
 import json
 from pathlib import Path
 from typing import List
+from logging_config import get_logger
 
 from document_model import PanelPydantic
 from markdown_document import MarkdownDocument
 from openai_service import generate_scene_analysis_from_ai
 
+logger = get_logger(__name__)
 
 def analyze_markdown_file(md_path: Path, character_json_path: Path) -> dict:
     doc = MarkdownDocument(filepath=str(md_path))
     if not doc.chapter_model:
-        print(f"⚠️ Failed to parse: {md_path.name}")
+        logger.warning("Failed to parse: %s", md_path.name)
         return {}
 
     report = {
@@ -93,11 +95,11 @@ def write_markdown_report(report_data: dict, output_path: Path):
         lines.append("\n---\n")
 
     output_path.write_text("\n".join(lines), encoding="utf-8")
-    print(f"✅ Report saved to: {output_path}")
+    logger.info("Report saved to: %s", output_path)
 
 
 def main():
-    print("\n📘 Scene Report Generator\n")
+    logger.info("\n📘 Scene Report Generator\n")
 
     md_input = input("Enter Markdown file or folder path: ").strip()
     character_json_path = input("Enter character JSON path: ").strip()
@@ -110,16 +112,16 @@ def main():
     out_path = Path(output_path)
 
     if not char_path.exists():
-        print("❌ Character JSON file not found.")
+        logger.error("Character JSON file not found.")
         return
 
     md_files = [md_path] if md_path.is_file() else list(md_path.glob("*.md"))
     if not md_files:
-        print("❌ No markdown files found.")
+        logger.error("No markdown files found.")
         return
 
     for file in md_files:
-        print(f"\n🔍 Analyzing {file.name}...")
+        logger.info("\n🔍 Analyzing %s...", file.name)
         report_data = analyze_markdown_file(file, char_path)
         if report_data:
             if len(md_files) > 1:

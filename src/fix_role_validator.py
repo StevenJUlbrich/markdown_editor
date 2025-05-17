@@ -6,6 +6,9 @@ import json
 import sys
 from pathlib import Path
 from typing import Dict, List, Union
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def clean_roles_list(roles: List[Union[str, List[str]]]) -> List[str]:
@@ -30,13 +33,13 @@ def fix_role_validation(
     md_path = Path(markdown_dir_path)
 
     if not char_path.exists():
-        print(f"Error: Character JSON file not found: {char_path}")
+        logger.error("Character JSON file not found: %s", char_path)
         return
     if not md_path.exists() or not md_path.is_dir():
-        print(f"Error: Markdown directory invalid: {md_path}")
+        logger.error("Markdown directory invalid: %s", md_path)
         return
 
-    print(f"Running role validation on {md_path} against {char_path}...")
+    logger.info("Running role validation on %s against %s...", md_path, char_path)
     report = validate_roles(char_path, md_path)
 
     # Collect unique roles from report with extra validation
@@ -49,18 +52,19 @@ def fix_role_validation(
             valid_roles = clean_roles_list(missing_roles)
             all_missing_roles.extend(valid_roles)
         else:
-            print(
-                f"Warning: Expected list for missing_roles, got {type(missing_roles).__name__}"
+            logger.warning(
+                "Expected list for missing_roles, got %s",
+                type(missing_roles).__name__,
             )
 
     # Create a set of unique string roles
     missing_roles_set = set(all_missing_roles)
 
     if not missing_roles_set:
-        print("✅ All roles are already covered. No characters needed.")
+        logger.info("All roles are already covered. No characters needed.")
         return
 
-    print(f"📝 Missing Roles Detected: {', '.join(sorted(missing_roles_set))}")
+    logger.info("📝 Missing Roles Detected: %s", ", ".join(sorted(missing_roles_set)))
 
     confirm = (
         input("Proceed to generate characters for these roles? (yes/no): ")
@@ -68,23 +72,23 @@ def fix_role_validation(
         .lower()
     )
     if confirm != "yes":
-        print("Operation cancelled.")
+        logger.info("Operation cancelled.")
         return
 
-    print(f"Generating {per_role} characters for each missing role...")
+    logger.info("Generating %d characters for each missing role...", per_role)
     generate_character_profiles_for_roles(
         list(missing_roles_set),  # Convert set back to list of strings
         input_json_path=char_path,
         output_json_path=char_path,
         characters_per_role=per_role,
     )
-    print("Character generation complete!")
+    logger.info("Character generation complete!")
 
 
 if __name__ == "__main__":
     if len(sys.argv) <= 2:
         # Interactive mode
-        print("--- Scan Markdown and Auto-Patch Character JSON ---")
+        logger.info("--- Scan Markdown and Auto-Patch Character JSON ---")
         char_json_path = input("Enter path to character JSON: ").strip()
         md_dir_path = input("Enter markdown directory path: ").strip()
         per_role_input = input("How many characters per role? (default: 2): ").strip()

@@ -1,6 +1,9 @@
 # main.py (refactored CLI)
 
 from app_controller import AppController
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def print_panel_list(panel_list):
@@ -84,7 +87,7 @@ def main():
                         print(f"  Panel: {panel_title}")
                         print(f"    Suggested Roles: {roles}")
             except Exception as e:
-                print(f"Error: {e}")
+                logger.error("Error: %s", e)
 
         elif choice == "0":
             print("Exiting.")

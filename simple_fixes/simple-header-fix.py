@@ -2,6 +2,9 @@
 
 import os
 import re
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Strict header matches
 STRICT_HEADERS = {"## Learning Objectives", "## Key Takeaways"}
@@ -28,7 +31,7 @@ def process_file(file_path):
     with open(file_path, "w", encoding="utf-8") as f:
         f.writelines(updated_lines)
 
-    print(f"✔ {file_path}")
+    logger.info("✔ %s", file_path)
 
 
 def process_folder(folder_path):
@@ -45,7 +48,7 @@ def main():
     elif os.path.isdir(path):
         process_folder(path)
     else:
-        print(
+        logger.error(
             "❌ Invalid input. Please provide a markdown file or a folder of .md files."
         )
 
