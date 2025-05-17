@@ -6,9 +6,10 @@ from mistletoe.block_token import BlockToken, Heading
 from mistletoe.markdown_renderer import MarkdownRenderer
 from pydantic import BaseModel, Field
 
-from logging_config import setup_logging
+from logging_config import setup_logging, get_logger
 
 setup_logging()
+logger = get_logger(__name__)
 
 
 def _strip_outer_markdown_fences(markdown_text: str) -> str:
@@ -58,8 +59,8 @@ def render_blocks_to_markdown(
     try:
         temp_doc.children = valid_blocks
     except Exception as e:
-        print(f"Error assigning children in render_blocks_to_markdown: {e}")
-        print(f"Problematic valid_blocks (first 5): {valid_blocks[:5]}")
+        logger.error("Error assigning children in render_blocks_to_markdown: %s", e)
+        logger.debug("Problematic valid_blocks (first 5): %s", valid_blocks[:5])
         return "Error: Could not render blocks."
     return renderer.render(temp_doc).strip()
 
@@ -67,14 +68,14 @@ def render_blocks_to_markdown(
 _MODULE_LEVEL_RENDERER_INSTANCE: Optional[MarkdownRenderer] = None
 try:
     _MODULE_LEVEL_RENDERER_INSTANCE = MarkdownRenderer()
-    print(
-        "INFO: Module-level MarkdownRenderer instantiated successfully during import of document_model."
+    logger.info(
+        "Module-level MarkdownRenderer instantiated successfully during import of document_model."
     )
 except Exception as e:
-    print(
-        f"CRITICAL ERROR during import: Could not instantiate module-level MarkdownRenderer: {e}"
+    logger.critical(
+        "Could not instantiate module-level MarkdownRenderer: %s", e
     )
-    print("Further Mistletoe operations will likely fail.")
+    logger.critical("Further Mistletoe operations will likely fail.")
 
 
 class SceneAnalysisPydantic(BaseModel):

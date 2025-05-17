@@ -7,6 +7,9 @@ import re
 from typing import Any, Dict, List
 
 from openai_service import client
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def clean_json_list_from_fenced_response(raw: str) -> List[str]:
@@ -17,9 +20,9 @@ def clean_json_list_from_fenced_response(raw: str) -> List[str]:
         if isinstance(parsed, list):
             return [item for item in parsed if isinstance(item, str)]
         else:
-            print("Warning: OpenAI response was not a list:", parsed)
+            logger.warning("OpenAI response was not a list: %s", parsed)
             return []
     except Exception as e:
-        print("Warning: Failed to parse JSON response:", e)
-        print("Raw response was:", raw)
+        logger.warning("Failed to parse JSON response: %s", e)
+        logger.debug("Raw response was: %s", raw)
         return []
