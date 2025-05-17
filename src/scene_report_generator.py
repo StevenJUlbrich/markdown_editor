@@ -5,7 +5,7 @@ from logging_config import get_logger
 
 from models.document_model import PanelPydantic
 from parsing.markdown_document import MarkdownDocument
-from openai_service import generate_scene_analysis_from_ai
+from services.openai_service import generate_scene_analysis_from_ai
 
 logger = get_logger(__name__)
 

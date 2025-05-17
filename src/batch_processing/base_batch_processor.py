@@ -78,7 +78,7 @@ class BaseBatchProcessor:
                 context_parts.append(section_map[section])
         panel_context = "\n\n".join(context_parts)
 
-        from openai_service import get_enhancement_suggestions_for_panel_h3s
+        from services.openai_service import get_enhancement_suggestions_for_panel_h3s
 
         # Get suggestions for panel H3 sections
         suggestions = get_enhancement_suggestions_for_panel_h3s(

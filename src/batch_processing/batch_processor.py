@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import openai_service
+from services import openai_service
 from batch_processing.base_batch_processor import BaseBatchProcessor
 from models.document_model import H3Pydantic, PanelPydantic
 from logging_config import get_logger

@@ -2,10 +2,10 @@ import json
 from pathlib import Path
 from typing import Dict, Optional
 
-from generate_character_profiles import generate_character_profiles_for_roles
+from services.generate_character_profiles import generate_character_profiles_for_roles
 from logging_config import get_logger
 from parsing.markdown_document import MarkdownDocument
-from openai_service import (
+from services.openai_service import (
     generate_narration_title_for_panel,
     generate_speech_bubbles_for_panel,
     rewrite_scene_and_teaching_as_summary,
@@ -28,7 +28,7 @@ def process_panel_to_json(
     import json
     from pathlib import Path
 
-    from openai_service import (
+    from services.openai_service import (
         generate_narration_title_for_panel,
         generate_scene_analysis_from_ai,
         generate_speech_bubbles_for_panel,
