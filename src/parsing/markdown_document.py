@@ -13,7 +13,7 @@ from models.document_model import (
 )
 from parsing.document_model_builder import DocumentModelBuilder
 from parsing.document_validator import DocumentValidator
-from markdown_file_manager import MarkdownFileManager
+from parsing.markdown_file_manager import MarkdownFileManager
 from parsing.markdown_parser import MarkdownParser
 from parsing.panel_section_manager import PanelSectionManager
 
