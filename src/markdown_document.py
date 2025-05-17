@@ -5,7 +5,7 @@ from typing import Optional
 
 from mistletoe import Document
 
-from document_model import (
+from models.document_model import (
     _MODULE_LEVEL_RENDERER_INSTANCE,
     ChapterPydantic,
     PanelPydantic,
