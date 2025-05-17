@@ -4,7 +4,7 @@ from typing import List
 from logging_config import get_logger
 
 from models.document_model import PanelPydantic
-from markdown_document import MarkdownDocument
+from parsing.markdown_document import MarkdownDocument
 from openai_service import generate_scene_analysis_from_ai
 
 logger = get_logger(__name__)

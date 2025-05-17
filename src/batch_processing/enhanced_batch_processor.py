@@ -6,7 +6,7 @@ from typing import List, Union
 from batch_processing.base_batch_processor import BaseBatchProcessor
 from models.document_model import H3Pydantic, PanelPydantic
 from logging_config import get_logger
-from markdown_document import MarkdownDocument
+from parsing.markdown_document import MarkdownDocument
 from openai_service import (
     get_enhancement_suggestions_for_panel_h3s,
     get_improved_markdown_for_section,

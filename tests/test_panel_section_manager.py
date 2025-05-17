@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath('src'))
 
-from src.panel_section_manager import PanelSectionManager
+from src.parsing.panel_section_manager import PanelSectionManager
 from models.document_model import PanelPydantic, H3Pydantic
 
 
