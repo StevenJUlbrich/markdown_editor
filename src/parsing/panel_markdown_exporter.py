@@ -9,6 +9,24 @@ from models.comic_panel_image_sheet import ComicPanelImageSheet
 logger = logging.getLogger(__name__)
 
 
+def get_alt_text_for_image(panel_image, enhancement, panel_sheet):
+    # Prefer explicit alt text
+    if panel_image and panel_image.alt_text and panel_image.alt_text.strip():
+        return panel_image.alt_text.strip()
+    # Fallback: Use LLM-generated alt if present in metadata
+    if enhancement and enhancement.llm_metadata.get("image_alt_text"):
+        return enhancement.llm_metadata["image_alt_text"].strip()
+    # Fallback: Use a short neutral summary or scene text
+    if enhancement and enhancement.llm_metadata.get("neutral_scene_summary"):
+        return enhancement.llm_metadata["neutral_scene_summary"][:80].strip()
+    if enhancement and enhancement.scene_text:
+        return enhancement.scene_text[:80].strip()
+    if panel_sheet.scene_description_original:
+        return panel_sheet.scene_description_original[:80].strip()
+    # Last resort
+    return "Panel artwork for this scene."
+
+
 def build_panel_markdown_block(
     panel_sheet: ComicPanelImageSheet, enhancement_index: int = 0
 ) -> str:
@@ -16,7 +34,6 @@ def build_panel_markdown_block(
     Build upgraded markdown for a single panel, using enriched data and image info.
     enhancement_index: which SceneEnhancement to use (default: first).
     """
-    # Defensive: Handle missing enhancements gracefully
     se = None
     # Prefer selected enhancement by version_id
     if panel_sheet.current_scene_enhancement:
@@ -50,13 +67,26 @@ def build_panel_markdown_block(
     else:
         lines.append(panel_sheet.scene_description_original.strip())
 
-    # H4: Panel Image (if present)
-    if panel_image:
-        lines.append("#### Panel Image")
-        width_str = f"{{width={panel_image.width}}}" if panel_image.width else ""
-        lines.append(
-            f"![{panel_image.alt_text}]({panel_image.image_filename}){width_str}"
+    # H4: Panel Image (even if missing—use fallback and log warning)
+    lines.append("#### Panel Image")
+    if panel_image and panel_image.image_filename:
+        image_filename = panel_image.image_filename
+    else:
+        logger.warning(
+            f"Panel {panel_sheet.panel_id}: No image found for enhancement '{se.version_id if se else '?'}'. Using placeholder image."
         )
+        image_filename = "images/missing.png"
+
+    alt_text = get_alt_text_for_image(panel_image, se, panel_sheet)
+    if not panel_image or not panel_image.alt_text or not panel_image.alt_text.strip():
+        logger.warning(
+            f"Panel {panel_sheet.panel_id}: Alt text missing or fallback used for image '{image_filename}'."
+        )
+
+    width_str = (
+        f"{{width={panel_image.width}}}" if panel_image and panel_image.width else ""
+    )
+    lines.append(f"![{alt_text}]({image_filename}){width_str}")
 
     # H3: Teaching Narrative
     lines.append("### Teaching Narrative")
