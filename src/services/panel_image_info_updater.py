@@ -68,6 +68,25 @@ def update_panel_images_for_sheets(
     return sheets
 
 
+def get_alt_text_for_image(panel_image, enhancement, panel_sheet):
+    # Prefer explicit alt text
+    if panel_image and panel_image.alt_text and panel_image.alt_text.strip():
+        return panel_image.alt_text.strip()
+    # Fallback: Use LLM-generated alt if present in metadata
+    if enhancement.llm_metadata.get("image_alt_text"):
+        return enhancement.llm_metadata["image_alt_text"].strip()
+    # Fallback: Use a short neutral summary or scene text
+    if enhancement.llm_metadata.get("neutral_scene_summary"):
+        return enhancement.llm_metadata["neutral_scene_summary"][:80].strip()
+    if enhancement.scene_text:
+        return enhancement.scene_text[:80].strip()
+    # Fallback: Use the original scene description from the panel
+    if panel_sheet.scene_description_original:
+        return panel_sheet.scene_description_original[:80].strip()
+    # As a last resort, generic text
+    return "Panel artwork for this scene."
+
+
 # Example usage:
 # enriched_sheets = load_your_enriched_sheets()  # List[ComicPanelImageSheet]
 # update_panel_images_for_sheets(enriched_sheets, image_dir="images")

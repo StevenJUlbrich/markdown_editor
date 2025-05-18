@@ -1,9 +1,12 @@
 # panel_markdown_exporter.py
 
+import logging
 import os
 from typing import List, Optional
 
 from models.comic_panel_image_sheet import ComicPanelImageSheet
+
+logger = logging.getLogger(__name__)
 
 
 def build_panel_markdown_block(
@@ -15,10 +18,19 @@ def build_panel_markdown_block(
     """
     # Defensive: Handle missing enhancements gracefully
     se = None
-    if panel_sheet.scene_enhancements and 0 <= enhancement_index < len(
-        panel_sheet.scene_enhancements
-    ):
-        se = panel_sheet.scene_enhancements[enhancement_index]
+    # Prefer selected enhancement by version_id
+    if panel_sheet.current_scene_enhancement:
+        for idx, candidate in enumerate(panel_sheet.scene_enhancements):
+            if candidate.version_id == panel_sheet.current_scene_enhancement:
+                se = candidate
+                break
+    # Fallback: use provided index or first
+    if not se:
+        idx = enhancement_index if enhancement_index is not None else 0
+        if panel_sheet.scene_enhancements and 0 <= idx < len(
+            panel_sheet.scene_enhancements
+        ):
+            se = panel_sheet.scene_enhancements[idx]
 
     panel_image = se.panel_image if se and se.panel_image else None
 
