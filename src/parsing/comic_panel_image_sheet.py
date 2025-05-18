@@ -1,4 +1,4 @@
-# comic_panel_image_sheet.py
+# models/comic_panel_image_sheet.py
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -64,10 +64,4 @@ class ComicPanelImageSheet(BaseModel):
     # Optionally store current selected enhancement for output
     current_scene_enhancement: Optional[str] = None  # version_id
 
-    class Config:
-        arbitrary_types_allowed = True
-        orm_mode = True
-
-
-# Example usage: Creating a new ComicPanelImageSheet from extracted markdown panel data
-# (You can add helper methods to assist with mapping, retrieval, or exporting as needed.)
+    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}

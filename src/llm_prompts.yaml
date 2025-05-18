@@ -1,0 +1,106 @@
+scene_theme_analysis: |
+  You are an expert SRE graphic novel script editor.
+  Given this scene description:
+  ---
+  {scene_text}
+  ---
+  Identify the dominant scene theme for this panel. Choose from: Chaos, Reflection, Teaching, Decision, Meta, or other appropriate category.
+  Return only a JSON object:
+  {{
+    "scene_theme": "<type>",
+    "rationale": "<short explanation>"
+  }}
+
+role_extraction: |
+  As a team composition advisor for SRE educational comics:
+  Given the theme "{scene_theme}", list the minimum roles required for this scene (choose from SRE Lead, junior SRE, SRE Engineer, etc.), plus a one-sentence rationale for each.
+  Return as a JSON array:
+  [
+    {{"role": "<role_name>", "rationale": "<reason>"}},
+    ...
+  ]
+
+scene_rewrite: |
+  Rewrite this panel scene for a graphic novel.
+  - Include these roles: {required_roles}.
+  - Use the time of day if mentioned to enhance mood.
+  - Make the SRE Lead guide or teach the junior SRE(s).
+  - Let any chaos be emotional/psychological, not physical noise.
+  Scene:
+  ---
+  {original_scene}
+  ---
+  Return only the rewritten scene text.
+
+scene_checklist_evaluation: |
+  Evaluate this revised panel scene against the following:
+  - Does the scene provide a clear teaching narrative or moment?
+  - Is it consistent with this Common Example of the Problem?
+    ---
+    {common_example}
+    ---
+  - Are all required roles ({required_roles}) present and used purposefully?
+  Return only a JSON object:
+  {{
+    "teaching_narrative_satisfied": true/false,
+    "common_example_aligned": true/false,
+    "roles_used_effectively": true/false,
+    "missing_elements": "<list any missing or weak elements>"
+  }}
+
+scene_rewrite_fix: |
+  Revise the following scene to address these missing elements: {missing_elements}
+  Scene:
+  ---
+  {scene_text}
+  ---
+  Make sure to satisfy the teaching narrative, align with the problem example, and use all required roles.
+
+character_enhancement: |
+  For each role in this list: {required_roles}, provide a realistic SRE comic character:
+  - name
+  - role
+  - visual_tags (list)
+  - required_constraints (list)
+  - voice_tone
+  - appearance (one vivid sentence)
+  If a character is already defined, skip or use their canonical details.
+  Return as a JSON array:
+  [
+    {{
+      "name": "<name>",
+      "role": "<role>",
+      "visual_tags": [ ... ],
+      "required_constraints": [ ... ],
+      "voice_tone": "<tone>",
+      "appearance": "<description>"
+    }},
+    ...
+  ]
+
+speech_bubble_generation: |
+  For this scene and these characters, generate realistic speech bubbles:
+  - Each character's dialogue (≤20 words)
+  - Note if the character is present digitally (e.g., Slack, Zoom, SMS) or in person.
+  - If a character is silent in this scene, return an empty string.
+  Scene:
+  ---
+  {scene_text}
+  ---
+  Characters:
+  {characters}
+  Return as a JSON array:
+  [
+    {{
+      "character": "<name>",
+      "role": "<role>",
+      "speech": "<bubble text>",
+      "interface": "in_person|slack|zoom|sms|..."
+    }},
+    ...
+  ]
+
+# Optionally add more prompts for:
+# - Image prompt generation (DALL-E, etc.)
+# - QA review feedback
+# - Panel summary, lesson extraction, etc.
