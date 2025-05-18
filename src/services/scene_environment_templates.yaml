@@ -1,0 +1,47 @@
+Chaos:
+  description: |
+    A dim, shadowy operations center at {{time_of_day}}. The cold glow of monitors barely cuts through the dark, amplifying the silence between urgent phone rings. Junior SREs, eyes wide and tense, huddle together—every dashboard green, every customer furious, and no one has answers. Emotional chaos reigns: confusion, fatigue, and disbelief fill the air.
+  psychological_cues:
+    - confusion
+    - tension
+    - disbelief
+    - isolation
+  teaching_hint: |
+    Tonight’s lesson isn’t in the logs—it’s in realizing green dashboards can lie.
+Teaching:
+  description: |
+    Bright but quiet workspace. Senior SRE stands beside a trainee, pointing at a flow diagram and walking through a problem step by step. The mood is focused, supportive, with questions encouraged.  
+  psychological_cues:
+    - curiosity
+    - focus
+    - cautious optimism
+  teaching_hint: |
+    Every metric is a question, not an answer—let’s find out what’s really happening.
+Reflection:
+  description: |
+    The incident is over. The team, exhausted but wiser, sits together with coffees, reviewing what went wrong and what they’ll do better next time. There’s a sense of relief and honest reflection.
+  psychological_cues:
+    - relief
+    - learning
+    - humility
+  teaching_hint: |
+    We learn more from failure than green lights.
+# ...continue for Meta, Decision, etc.
+Meta:
+  description: |
+    A sleek, modern office with a large screen displaying the incident timeline. The atmosphere is calm but serious, with team members discussing strategies and reviewing logs. The mood is analytical and collaborative.
+  psychological_cues:
+    - analysis
+    - collaboration
+    - strategic thinking
+  teaching_hint: |
+    Every incident is a chance to refine our processes and improve our systems.
+Decision:
+  description: |
+    A high-pressure situation in a control room. The team is gathered around a table, debating the next steps. The mood is tense but focused, with everyone contributing to the decision-making process.
+  psychological_cues:
+    - urgency
+    - focus
+    - teamwork
+  teaching_hint: |
+    Decisions made under pressure can define our success—let’s make them count.
