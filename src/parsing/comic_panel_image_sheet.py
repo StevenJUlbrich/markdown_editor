@@ -1,6 +1,4 @@
-# models/comic_panel_image_sheet.py
-
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -12,56 +10,60 @@ class ChecklistResult(BaseModel):
     roles_used_effectively: bool
     missing_elements: Optional[str] = ""
     reviewer_notes: Optional[str] = ""
-    timestamp: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    timestamp: Optional[datetime] = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
 
 
 class SpeechBubble(BaseModel):
     character_name: str
     role: str
-    speech: str  # Leave blank if silent
+    speech: str
     interface: str  # "in_person", "zoom", "slack", etc.
+
+    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
+
+
+class PanelImageInfo(BaseModel):
+    image_filename: str  # e.g., "images/ch1_p1_something.png"
+    alt_text: str  # e.g., "Pager blares while Manu’s face glows green..."
+    caption: Optional[str] = ""
+    width: Optional[int] = 640
+    llm_image_prompt: Optional[str] = None
+    llm_model: Optional[str] = None
+
+    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
 
 
 class SceneEnhancement(BaseModel):
-    version_id: str  # e.g. "v1", "ab-test-a", "llm-20240518-gpt4o"
+    version_id: str
     scene_text: str
-    llm_metadata: Dict[str, Any] = Field(
-        default_factory=dict
-    )  # e.g., prompt, model, temperature, etc.
+    llm_metadata: Dict[str, Any] = Field(default_factory=dict)
     checklist: Optional[ChecklistResult] = None
-    image_prompt_json: Optional[Dict[str, Any]] = None  # For DALL-E, Stable Diff, etc.
-    user_rating: Optional[str] = ""  # For human QA/A/B ranking
+    panel_image: Optional[PanelImageInfo] = None
+    image_prompt_json: Optional[Dict[str, Any]] = None
+    user_rating: Optional[str] = ""
+
+    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
 
 
 class ComicPanelImageSheet(BaseModel):
-    # Basic panel identifiers
     panel_id: str
     chapter_id: Optional[str] = None
     panel_index: Optional[int] = None
-
-    # Original extracted content for traceability
     scene_description_original: str
     teaching_narrative_original: str
     common_example_original: str
-
-    # All LLM-generated or manually-enhanced scene versions
     scene_enhancements: List[SceneEnhancement] = Field(default_factory=list)
-
-    # Speech bubbles for the current/selected enhancement
     speech_bubbles: List[SpeechBubble] = Field(default_factory=list)
-
-    # Checklist results for LLM/human evaluation (latest or per-version)
     checklist_results: List[ChecklistResult] = Field(default_factory=list)
-
-    # LLM or user metadata for audit/tracing
-    processing_metadata: Dict[str, Any] = Field(
-        default_factory=dict
-    )  # e.g., {"processed_by": "main.py", "llm_model": "gpt-4o"}
-
-    # Downstream output for image prompt pipelines
+    processing_metadata: Dict[str, Any] = Field(default_factory=dict)
     image_prompt_json: Optional[Dict[str, Any]] = None
-
-    # Optionally store current selected enhancement for output
-    current_scene_enhancement: Optional[str] = None  # version_id
+    current_scene_enhancement: Optional[str] = None
+    panel_image: Optional[PanelImageInfo] = (
+        None  # Optional, for panel-level legacy/compat
+    )
 
     model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
