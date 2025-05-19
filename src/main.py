@@ -24,9 +24,8 @@ def main():
         print("4. Show Named Sections in Selected Panel")
         print("5. Update Named Section in Panel")
         print("6. Save Document")
-        print(
-            "7. Suggest Character Roles Only (Panels in Folder)"
-        )  # adjust number as needed
+        print("7. Suggest Character Roles Only (Panels in Folder)")
+        print("8. Export Enriched Scene JSON")
         print("0. Exit")
         choice = input("Enter your choice: ").strip()
 
@@ -88,7 +87,18 @@ def main():
                         print(f"    Suggested Roles: {roles}")
             except Exception as e:
                 logger.error("Error: %s", e)
+        elif choice == "8":
+            if not document_loaded:
+                print("Load and enrich a document first.")
+                continue
+            # Optionally, check if panels are already enriched, or enrich now:
+            enriched = controller.enrich_all_panels()  # Or load if already done
+            out_path = input(
+                "Enter output JSON file path (e.g. chapter_01_enriched.json): "
+            ).strip()
+            from services.chapter_scene_json_exporter import export_chapter_to_json
 
+            export_chapter_to_json(enriched, out_path)
         elif choice == "0":
             print("Exiting.")
             break
