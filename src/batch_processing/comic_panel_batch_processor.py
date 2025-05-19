@@ -1,6 +1,5 @@
 # src/batch_processing/comic_panel_batch_processor.py
 
-import argparse
 import json
 import os
 
@@ -13,16 +12,6 @@ from models.comic_panel_image_sheet import (
     SpeechBubble,
 )
 from parsing.comic_panel_mapping import create_panel_sheets_from_markdown
-
-
-def load_llm_prompts(llm_prompts_path):
-    with open(llm_prompts_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-def load_character_db(character_json_path):
-    with open(character_json_path, "r", encoding="utf-8") as f:
-        return json.load(f)["characters"]
 
 
 def ask_openai(prompt):
@@ -133,50 +122,22 @@ def process_markdown_directory(md_dir, llm_prompts, character_db):
     return enriched_files
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Batch process SRE comic panels with LLM."
-    )
-    parser.add_argument("--file", type=str, help="Markdown file to process")
-    parser.add_argument(
-        "--dir", type=str, help="Directory of markdown files to process"
-    )
-    parser.add_argument(
-        "--prompts",
-        type=str,
-        default="llm_prompts.yaml",
-        help="Path to LLM prompts YAML",
-    )
-    parser.add_argument(
-        "--characters",
-        type=str,
-        default="character_base_list.json",
-        help="Path to character base list JSON",
-    )
-    parser.add_argument(
-        "--out", type=str, help="Output JSON file (for single file mode)"
-    )
-    args = parser.parse_args()
+def load_llm_prompts(llm_prompts_path):
+    with open(llm_prompts_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
 
-    llm_prompts = load_llm_prompts(args.prompts)
-    character_db = load_character_db(args.characters)
 
-    if args.file:
-        enriched_panels = process_markdown_file(args.file, llm_prompts, character_db)
-        out_path = args.out or (os.path.splitext(args.file)[0] + "_enriched.json")
-        with open(out_path, "w", encoding="utf-8") as out:
-            json.dump([p.model_dump() for p in enriched_panels], out, indent=2)
-        print(f"Enriched panels saved to {out_path}")
+def load_character_db(character_json_path):
+    with open(character_json_path, "r", encoding="utf-8") as f:
+        return json.load(f)["characters"]
 
-    elif args.dir:
-        enriched_files = process_markdown_directory(args.dir, llm_prompts, character_db)
-        for fname, panels in enriched_files.items():
-            out_path = os.path.join(
-                args.dir, f"{os.path.splitext(fname)[0]}_enriched.json"
-            )
-            with open(out_path, "w", encoding="utf-8") as out:
-                json.dump(panels, out, indent=2)
-            print(f"Enriched file saved to {out_path}")
 
-    else:
-        parser.print_help()
+# This file does not include CLI logic.
+# All function calls are explicit, meant to be triggered by controller or GUI.
+
+# Example usage in controller:
+# llm_prompts = load_llm_prompts("llm_prompts.yaml")
+# character_db = load_character_db("character_base_list.json")
+# enriched_panels = process_markdown_file("chapter_01.md", llm_prompts, character_db)
+# (or)
+# enriched_files = process_markdown_directory("./chapters/", llm_prompts, character_db)
