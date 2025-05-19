@@ -5,8 +5,7 @@ src/
 │   ├── batch_processor.py
 │   ├── comic_panel_batch_orchestrator.py
 │   ├── comic_panel_batch_processor.py
-│   ├── enhanced_batch_processor.py
-│   └── llm_prompts.yaml
+│   └── enhanced_batch_processor.py
 ├── models/
 │   ├── __init__.py
 │   ├── comic_panel_image_sheet.py
@@ -14,7 +13,6 @@ src/
 │   └── section_titles.py
 ├── parsing/
 │   ├── __init__.py
-│   ├── comic_panel_image_sheet.py
 │   ├── comic_panel_mapping.py
 │   ├── document_model_builder.py
 │   ├── document_validator.py
