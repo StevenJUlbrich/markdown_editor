@@ -1,3 +1,7 @@
+# Suggest Character Roles Only (all panels in a folder)
+
+## Overview
+
 Below are **Mermaid-ready** diagrams for the **“Suggest Character Roles Only (all panels in a folder)”** command exposed by **`src/main.py`**.
 They follow the same MVC format you requested for earlier flows and use the modules shown in your repository listing .
 

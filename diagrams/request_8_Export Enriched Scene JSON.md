@@ -1,3 +1,7 @@
+# Export Enriched Scene JSON
+
+## Overview
+
 Below are **Mermaid-compatible** diagrams for the **“Export Enriched Scene JSON”** command in **`src/main.py`**.
 They follow the same MVC style as the earlier sets and reference the modules present in your repo (e.g. `scene_enhancer.py`, `chapter_scene_json_exporter.py`) .
 

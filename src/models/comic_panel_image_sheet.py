@@ -21,7 +21,7 @@ class SpeechBubble(BaseModel):
     speech: str  # Leave blank if silent
     interface: str  # "in_person", "zoom", "slack", etc.
 
-    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
+    model_config = {"arbitrary_types_allowed": True, "from_orm": True}
 
 
 class SceneEnhancement(BaseModel):
@@ -34,7 +34,7 @@ class SceneEnhancement(BaseModel):
     image_prompt_json: Optional[Dict[str, Any]] = None  # For DALL-E, Stable Diff, etc.
     user_rating: Optional[str] = ""  # For human QA/A/B ranking
 
-    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
+    model_config = {"arbitrary_types_allowed": True, "from_orm": True}
 
 
 class ComicPanelImageSheet(BaseModel):
@@ -70,7 +70,7 @@ class ComicPanelImageSheet(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-        orm_mode = True
+        from_attributes = True
 
 
 # Example usage: Creating a new ComicPanelImageSheet from extracted markdown panel data

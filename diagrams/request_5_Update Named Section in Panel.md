@@ -1,3 +1,7 @@
+# Request 5: Update Named Section in Panel
+
+## Overview
+
 Below is an **MVC-aligned** map of the *“Update Named Section in Panel”* command exposed by **`src/main.py`**.
 As before, you get a **flowchart** and a **sequence diagram** you can paste straight into any Mermaid-enabled renderer (or your Kroki container).
 Module names match the folders and files listed in `dir_report_may_19_2025.txt` .

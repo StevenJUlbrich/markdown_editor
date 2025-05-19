@@ -6,8 +6,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-from models.document_model import SceneAnalysisPydantic
 from logging_config import get_logger
+from models.document_model import SceneAnalysisPydantic
+
 from .utils import (
     clean_and_flatten_roles,
     clean_json_list_from_response,
@@ -64,7 +65,9 @@ def suggest_character_roles_for_panels(
         )
     prompt = f"""
 You are a technical storyboard designer for a graphic novel that teaches SRE.
-For each panel below, suggest up to 4 character roles that should be visually present.
+For each panel below, suggest up to 4 individual character roles that should be visually present.
+Roles should reflect the scene's context and teaching narrative and can include roles like "SRE Engineer", "Junior Developer", "Product Owner", etc.
+The roles names should be clear and concise, suitable for visual representation in a comic panel.
 Return a JSON dictionary: {{ "Panel Title 1": [roles...], ... }}
 {''.join(prompt_panels)}
 Respond ONLY with the JSON object.
@@ -192,9 +195,7 @@ Ensure your entire response is a single, valid JSON object. Do not add any expla
         logger.debug("Raw response was:\n>>>\n%s\n<<<", raw_response_content)
         return {}
     except Exception as e:
-        logger.exception(
-            "Unexpected error getting suggestions: %s", e
-        )
+        logger.exception("Unexpected error getting suggestions: %s", e)
         return {}
 
 
@@ -584,9 +585,7 @@ Respond with ONLY a single valid JSON object. Do not wrap in markdown fences. No
         )
     except Exception as e:
         logger.error("Error during scene analysis generation: %s", e)
-        logger.debug(
-            "Raw response: %s", content if "content" in locals() else "None"
-        )
+        logger.debug("Raw response: %s", content if "content" in locals() else "None")
         return SceneAnalysisPydantic(
             scene_types=["Teaching Scene"],
             inferred_by_ai=True,

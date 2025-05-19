@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 
 from mistletoe import Document
-
 from models.document_model import (
     _MODULE_LEVEL_RENDERER_INSTANCE,
     ChapterPydantic,
@@ -31,6 +30,22 @@ class MarkdownDocument:
         self.raw_content: Optional[str] = None
         self.mistletoe_doc: Optional[Document] = None
         self.chapter_model: Optional[ChapterPydantic] = None
+
+    def get_panel_markdown_by_number(self, panel_number: int) -> str:
+        """
+        Return the raw Markdown block corresponding to a numbered Panel (H2 “Panel #” heading).
+
+        Args:
+            panel_number: 1-based index of the panel to retrieve.
+
+        Raises:
+            ValueError: if the panel cannot be found.
+        """
+        # Delegate to the same logic used by your list-panels command
+        panel = self.get_panel_by_number(panel_number)
+        if panel is None:
+            raise ValueError(f"Panel {panel_number} not found in document.")
+        return panel.raw_markdown
 
     def load_and_process(self, filepath: str) -> bool:
         self.filepath = filepath
