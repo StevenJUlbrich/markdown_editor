@@ -1,0 +1,51 @@
+src/
+├── batch_processing/
+│   ├── __init__.py
+│   ├── base_batch_processor.py
+│   ├── batch_processor.py
+│   ├── comic_panel_batch_orchestrator.py
+│   ├── comic_panel_batch_processor.py
+│   ├── enhanced_batch_processor.py
+│   └── llm_prompts.yaml
+├── models/
+│   ├── __init__.py
+│   ├── comic_panel_image_sheet.py
+│   ├── document_model.py
+│   └── section_titles.py
+├── parsing/
+│   ├── __init__.py
+│   ├── comic_panel_image_sheet.py
+│   ├── comic_panel_mapping.py
+│   ├── document_model_builder.py
+│   ├── document_validator.py
+│   ├── markdown_document.py
+│   ├── markdown_file_manager.py
+│   ├── markdown_parser.py
+│   ├── panel_markdown_exporter.py
+│   └── panel_section_manager.py
+├── pipeline/
+│   ├── __init__.py
+│   └── comic_image_pipeline.py
+├── services/
+│   ├── __init__.py
+│   ├── chapter_scene_json_exporter.py
+│   ├── character_role_suggester.py
+│   ├── generate_character_profiles.py
+│   ├── image_markdown_sync_report.py
+│   ├── openai_service.py
+│   ├── panel_image_info_updater.py
+│   ├── scene_enhancer.py
+│   ├── scene_environment_templates.yaml
+│   ├── suggest_character_roles.py
+│   └── utils.py
+├── app_controller.py
+├── config.py
+├── diff_utils.py
+├── document.py
+├── export_chapter_scene_report.py
+├── fix_role_validator.py
+├── llm_prompts.yaml
+├── logging_config.py
+├── main.py
+├── role_validator_tool.py
+└── scene_report_generator.py

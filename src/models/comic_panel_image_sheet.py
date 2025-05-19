@@ -21,6 +21,8 @@ class SpeechBubble(BaseModel):
     speech: str  # Leave blank if silent
     interface: str  # "in_person", "zoom", "slack", etc.
 
+    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
+
 
 class SceneEnhancement(BaseModel):
     version_id: str  # e.g. "v1", "ab-test-a", "llm-20240518-gpt4o"
@@ -31,6 +33,8 @@ class SceneEnhancement(BaseModel):
     checklist: Optional[ChecklistResult] = None
     image_prompt_json: Optional[Dict[str, Any]] = None  # For DALL-E, Stable Diff, etc.
     user_rating: Optional[str] = ""  # For human QA/A/B ranking
+
+    model_config = {"arbitrary_types_allowed": True, "orm_mode": True}
 
 
 class ComicPanelImageSheet(BaseModel):
