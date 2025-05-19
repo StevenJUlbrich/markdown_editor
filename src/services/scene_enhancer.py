@@ -5,6 +5,14 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from models.comic_panel_image_sheet import (
+    ChecklistResult,
+    ComicPanelImageSheet,
+    SceneEnhancement,
+    SpeechBubble,
+)
+from services.openai_service import OpenAIService
+
 
 class SceneEnhancer:
     def __init__(
@@ -12,9 +20,11 @@ class SceneEnhancer:
         chapter_panels,
         character_repo,
         env_template_path="scene_environment_templates.yaml",
+        prompt_yaml_path=None,
     ):
         self.chapter_panels = chapter_panels
         self.character_repo = character_repo["characters"]
+        self.llm = OpenAIService(prompt_yaml_path)
         with open(env_template_path, "r", encoding="utf-8") as f:
             self.env_templates = yaml.safe_load(f)
 
@@ -144,6 +154,87 @@ class SceneEnhancer:
             # Step 6: Set emotion and pose
             self.set_character_emotion_and_pose(panel)
         return self.chapter_panels
+
+    def enrich_panel(self, panel_sheet: ComicPanelImageSheet):
+        # 1. Scene Theme
+        scene_theme_result = self.llm.prompt_and_call(
+            "scene_theme_analysis",
+            is_json=True,
+            scene_text=panel_sheet.scene_description_original,
+        )
+        scene_theme = scene_theme_result.get("scene_theme", "Chaos")
+
+        # 2. Roles
+        roles_result = self.llm.prompt_and_call(
+            "role_extraction", is_json=True, scene_theme=scene_theme
+        )
+        required_roles = [r["role"] for r in roles_result]
+
+        # 3. Rewrite Scene
+        scene_text = self.llm.prompt_and_call(
+            "scene_rewrite",
+            is_json=False,
+            required_roles=", ".join(required_roles),
+            original_scene=panel_sheet.scene_description_original,
+        )
+
+        # 4. Checklist + Fix/Iterate
+        for _ in range(2):  # Max two attempts for simplicity
+            checklist_result = self.llm.prompt_and_call(
+                "scene_checklist_evaluation",
+                is_json=True,
+                scene_text=scene_text,
+                common_example=panel_sheet.common_example_original,
+                required_roles=", ".join(required_roles),
+            )
+            if all(
+                [
+                    checklist_result["teaching_narrative_satisfied"],
+                    checklist_result["common_example_aligned"],
+                    checklist_result["roles_used_effectively"],
+                ]
+            ):
+                break
+            # Fix and re-prompt
+            scene_text = self.llm.prompt_and_call(
+                "scene_rewrite_fix",
+                is_json=False,
+                missing_elements=checklist_result["missing_elements"],
+                scene_text=scene_text,
+            )
+
+        # 5. Speech Bubbles
+        # (This could use more data for characters in your pipeline)
+        speech_bubbles = self.llm.prompt_and_call(
+            "speech_bubble_generation",
+            is_json=True,
+            scene_text=scene_text,
+            characters=str(required_roles),
+        )
+        speech_bubble_objs = [SpeechBubble(**b) for b in speech_bubbles]
+
+        # 6. Alt Text & Scene Summary
+        alt_text = self.llm.prompt_and_call(
+            "panel_image_alt_text", is_json=False, scene_text=scene_text
+        )
+        neutral_summary = self.llm.prompt_and_call(
+            "neutral_scene_summary", is_json=False, scene_text=scene_text
+        )
+
+        # 7. Assemble and update panel
+        enhancement = SceneEnhancement(
+            version_id="llm-v1",
+            scene_text=scene_text,
+            llm_metadata={
+                "scene_theme": scene_theme,
+                "neutral_scene_summary": neutral_summary,
+            },
+            checklist=ChecklistResult(**checklist_result),
+        )
+        panel_sheet.scene_enhancements = [enhancement]
+        panel_sheet.speech_bubbles = speech_bubble_objs
+        panel_sheet.current_scene_enhancement = "llm-v1"
+        return panel_sheet
 
 
 # Usage example (assuming you've parsed the markdown to a list of panel dicts and loaded the character JSON):
