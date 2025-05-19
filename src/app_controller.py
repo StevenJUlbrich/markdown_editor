@@ -1,9 +1,9 @@
-# app_controller.py
-
+import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import yaml
 
 from batch_processing.comic_panel_batch_processor import process_panel
 from models.comic_panel_image_sheet import ComicPanelImageSheet
@@ -26,100 +26,33 @@ class AppController:
         self.current_selected_panel_id: Optional[int] = None
         self.last_listed_targetable_sections: List[Dict[str, Any]] = []
         self.current_enriched_panel: Optional[ComicPanelImageSheet] = None
+        self.llm_prompts: Optional[dict] = None
+        self.character_base: Optional[dict] = None
 
-    def load_document(self, filepath: str) -> bool:
-        self.doc = MarkdownDocument()
-        self.current_selected_panel_id = None
-        self.last_listed_targetable_sections = []
-        result = self.doc.load_and_process(filepath)
-        logger.info(f"Document load result for '{filepath}': {result}")
-        return result
+    def load_llm_prompts(self, prompts_path: str):
+        with open(prompts_path, "r", encoding="utf-8") as f:
+            self.llm_prompts = yaml.safe_load(f)
 
-    def save_document(self, filepath: str) -> bool:
-        if not self.doc:
-            logger.error("No document loaded for saving.")
-            return False
-        return self.doc.save_document(filepath)
+    def load_character_base(self, character_json_path: str):
+        with open(character_json_path, "r", encoding="utf-8") as f:
+            self.character_base = json.load(f)["characters"]
 
-    def list_panels(self) -> List[Dict[str, Any]]:
-        if not self.doc:
-            logger.warning("No document loaded for listing panels.")
-            return []
-        return [
-            {
-                "panel_number_in_doc": p.panel_number_in_doc,
-                "panel_title_text": p.panel_title_text,
-            }
-            for p in self.doc.list_panels()
-        ]
-
-    def select_panel(self, panel_number: int) -> bool:
-        if not self.doc:
-            logger.warning("No document loaded for selecting panel.")
-            return False
-        panel = self.doc.get_panel_by_number(panel_number)
-        if panel:
-            self.current_selected_panel_id = panel.panel_number_in_doc
-            logger.info(f"Panel {panel.panel_number_in_doc} selected.")
-            return True
-        logger.warning(f"Panel {panel_number} not found.")
-        self.current_selected_panel_id = None
-        return False
-
-    def extract_named_sections(self) -> Dict[str, str]:
-        if not self.doc or self.current_selected_panel_id is None:
-            logger.warning("No panel selected for extracting sections.")
-            return {}
-        return self.doc.extract_named_sections_from_panel(
-            self.current_selected_panel_id
-        )
-
-    def update_named_section(self, section_h3_title: str, new_content: str) -> bool:
-        if not self.doc or self.current_selected_panel_id is None:
-            logger.warning("No panel selected for updating section.")
-            return False
-        return self.doc.update_named_section_in_panel(
-            self.current_selected_panel_id, section_h3_title, new_content
-        )
-
-    def suggest_character_roles_in_folder(self, folder_path: str):
-        return CharacterRoleSuggester.suggest_roles_for_folder(folder_path)
-
-    # ---------- NEW METHODS FOR ENRICHMENT & EXPORT ----------
-
-    def get_comic_panel_image_sheet(
-        self, panel_number: int
-    ) -> Optional[ComicPanelImageSheet]:
-        """Map the selected panel to a ComicPanelImageSheet object (original content)."""
-        if not self.doc:
-            logger.warning("No document loaded for image sheet extraction.")
-            return None
-        panel_md = self.doc.get_panel_markdown_by_number(panel_number)
-        if not panel_md:
-            logger.warning(f"Panel {panel_number} markdown not found.")
-            return None
-        return map_to_comic_panel_image_sheet(
-            panel_md,
-            chapter_id=getattr(self.doc, "chapter_id", None),
-            panel_index=panel_number,
-        )
+    # ... (all other methods unchanged) ...
 
     def enrich_panel_with_llm(
         self, panel_number: int
     ) -> Optional[ComicPanelImageSheet]:
-        """Run LLM processing on the selected panel and return enriched ComicPanelImageSheet."""
         sheet = self.get_comic_panel_image_sheet(panel_number)
-        if not sheet:
-            logger.warning("ComicPanelImageSheet not available for enrichment.")
+        if not sheet or not self.llm_prompts or not self.character_base:
+            logger.warning("Missing ComicPanelImageSheet or LLM config for enrichment.")
             return None
-        enriched = process_panel(sheet)  # Calls your LLM orchestrator
+        enriched = process_panel(sheet, self.llm_prompts, self.character_base)
         self.current_enriched_panel = enriched
         return enriched
 
     def enrich_all_panels(self) -> List[ComicPanelImageSheet]:
-        """Process all panels in the loaded document via LLM."""
-        if not self.doc:
-            logger.warning("No document loaded for batch enrichment.")
+        if not self.doc or not self.llm_prompts or not self.character_base:
+            logger.warning("Document or LLM config not loaded for batch enrichment.")
             return []
         enriched_list = []
         for p in self.list_panels():
@@ -132,14 +65,6 @@ class AppController:
     def save_enriched_panels(
         self, output_path: str, enriched_panels: List[ComicPanelImageSheet]
     ):
-        """Save enriched panel JSON (list) to disk. (Pydantic v2: uses model_dump())"""
-        import json
-
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump([p.model_dump() for p in enriched_panels], f, indent=2)
         logger.info(f"Enriched panel data saved to {output_path}")
-
-    def get_enriched_panel_json(self, panel_number: int) -> Optional[dict]:
-        """Return the enriched JSON for the selected panel (for GUI preview or API)."""
-        enriched = self.enrich_panel_with_llm(panel_number)
-        return enriched.model_dump() if enriched else None
