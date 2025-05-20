@@ -25,7 +25,6 @@ def main():
         print("5. Update Named Section in Panel")
         print("6. Save Document")
         print("7. Suggest Character Roles Only (Panels in Folder)")
-        print("8. Export Enriched Scene JSON")
         print("0. Exit")
         choice = input("Enter your choice: ").strip()
 

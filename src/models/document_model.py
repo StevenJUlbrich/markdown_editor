@@ -163,3 +163,30 @@ class ChapterPydantic(BaseModel):
 
 
 # --- Main Document Class ---
+class H4Pydantic(BaseModel):
+    heading_text: str
+    content_markdown: str
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
+
+
+class H3Pydantic(BaseModel):
+    heading_text: str
+    initial_content_markdown: str
+    h4_sections: List[H4Pydantic]
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
+
+
+class PanelPydantic(BaseModel):
+    panel_title_text: str
+    h3_sections: List[H3Pydantic]
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
+
+
+class ChapterPydantic(BaseModel):
+    chapter_title_text: str
+    document_elements: List[PanelPydantic]
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
