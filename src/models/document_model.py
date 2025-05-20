@@ -1,4 +1,3 @@
-# document_model.py
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
@@ -18,28 +17,18 @@ def _strip_outer_markdown_fences(markdown_text: str) -> str:
     """
     processed_text = markdown_text.strip()
     lines = processed_text.splitlines()
-
-    if len(lines) >= 2:  # Needs at least two lines for fences (e.g., ```\n```)
+    if len(lines) >= 2:
         starts_with_fence = lines[0].startswith("```")
         ends_with_fence = lines[-1] == "```"
-
         if starts_with_fence and ends_with_fence:
-            # Remove "markdown" language specifier if present on the first line
             if lines[0].startswith("```markdown"):
-                # Check if it's just ```markdown or ```markdown followed by content on the same line
-                # This simple version assumes ```markdown is on its own line or only has whitespace after.
-                # A more robust regex might be needed for complex cases.
-                pass  # Handled by slicing [1:-1]
-
-            # Join the content between the fences
+                pass
             content_between_fences = "\n".join(lines[1:-1])
             return content_between_fences.strip()
-    return processed_text  # Return original (stripped of outer whitespace) if not clearly fenced
+    return processed_text
 
 
-# --- Helper Function ---
 def get_heading_text(heading_node: Heading) -> str:
-    """Extracts all plain text from a Heading node, ignoring nested formatting."""
     if not hasattr(heading_node, "children"):
         return ""
     return "".join(
@@ -82,20 +71,39 @@ class SceneAnalysisPydantic(BaseModel):
     raw_summary: Optional[str] = None
     location: Optional[str] = None
     time_of_day: Optional[str] = None
-    tone: Optional[str] = None  # calm, tense, reflective, chaotic, etc.
-    teaching_level: Optional[str] = None  # basic, advanced, metaphorical, meta
+    tone: Optional[str] = None
+    teaching_level: Optional[str] = None
     notes: Optional[str] = None
 
 
-# --- Pydantic Models ---
-class H4Pydantic(BaseModel):
+# --- Versioning Mixin ---
+class VersionedContentMixin:
+    version: int = 1
+
+    def update_content(self, **fields):
+        changed = False
+        for field, value in fields.items():
+            if hasattr(self, field):
+                old = getattr(self, field)
+                if old != value:
+                    setattr(self, field, value)
+                    changed = True
+        if changed:
+            self.version += 1
+
+
+# --- Models ---
+class H4Pydantic(BaseModel, VersionedContentMixin):
     heading_text: str
     mistletoe_h4_block: Optional[Any] = None
     content_markdown: str = ""
     h4_number_in_h3: int
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
+    version: int = 1
 
 
-class H3Pydantic(BaseModel):
+class H3Pydantic(BaseModel, VersionedContentMixin):
     heading_text: str
     mistletoe_h3_block: Optional[Any] = None
     initial_content_markdown: str = ""
@@ -106,20 +114,29 @@ class H3Pydantic(BaseModel):
     api_suggested_enhancement_reason: Optional[str] = None
     api_improved_markdown: Optional[str] = None
     h3_number_in_panel: int
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
+    version: int = 1
 
 
-class PanelPydantic(BaseModel):
+class PanelPydantic(BaseModel, VersionedContentMixin):
     panel_title_text: str
     mistletoe_h2_block: Optional[Any] = None
     h3_sections: List[H3Pydantic] = Field(default_factory=list)
     panel_number_in_doc: Optional[int] = None
     scene_analysis: Optional[SceneAnalysisPydantic] = None
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
+    version: int = 1
 
 
-class GenericContentPydantic(BaseModel):
+class GenericContentPydantic(BaseModel, VersionedContentMixin):
     content_markdown: str
     mistletoe_blocks: List[Any] = Field(default_factory=list)
     title_text: Optional[str] = None
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
+    version: int = 1
 
 
 class ChapterPydantic(BaseModel):
@@ -128,6 +145,8 @@ class ChapterPydantic(BaseModel):
     document_elements: List[Union[GenericContentPydantic, PanelPydantic]] = Field(
         default_factory=list
     )
+    source_filename: Optional[str] = None
+    heading_line_number: Optional[int] = None
 
     def get_scene_balance_feedback(self) -> str:
         counts = self.get_scene_distribution()
@@ -150,7 +169,6 @@ class ChapterPydantic(BaseModel):
             feedback.append(
                 "⚠️ No Meta Scene. Could add conceptual grounding or diagrams."
             )
-
         return "\n".join(feedback) or "✅ Scene distribution looks balanced."
 
     def get_scene_distribution(self) -> Dict[str, int]:
@@ -160,33 +178,3 @@ class ChapterPydantic(BaseModel):
                 for tag in el.scene_analysis.scene_types:
                     counts[tag] = counts.get(tag, 0) + 1
         return counts
-
-
-# --- Main Document Class ---
-class H4Pydantic(BaseModel):
-    heading_text: str
-    content_markdown: str
-    source_filename: Optional[str] = None
-    heading_line_number: Optional[int] = None
-
-
-class H3Pydantic(BaseModel):
-    heading_text: str
-    initial_content_markdown: str
-    h4_sections: List[H4Pydantic]
-    source_filename: Optional[str] = None
-    heading_line_number: Optional[int] = None
-
-
-class PanelPydantic(BaseModel):
-    panel_title_text: str
-    h3_sections: List[H3Pydantic]
-    source_filename: Optional[str] = None
-    heading_line_number: Optional[int] = None
-
-
-class ChapterPydantic(BaseModel):
-    chapter_title_text: str
-    document_elements: List[PanelPydantic]
-    source_filename: Optional[str] = None
-    heading_line_number: Optional[int] = None

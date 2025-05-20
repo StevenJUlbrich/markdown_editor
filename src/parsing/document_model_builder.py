@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Any, List, Optional, Union
 
 from mistletoe import Document
@@ -26,12 +25,13 @@ class DocumentModelBuilder:
     Builds a Pydantic model tree from a mistletoe AST.
     Sets source_filename and heading_line_number on every node.
     Enforces only one H1 in the file.
+    Each node supports auto-bump versioning when content is edited via update_content().
     """
 
     def build(
         self, mistletoe_doc: Document, source_filename: str = "unknown.md"
     ) -> ChapterPydantic:
-        doc_elements: List[Union[PanelPydantic, Any]] = []
+        doc_elements: List[Union[PanelPydantic, GenericContentPydantic]] = []
         current_generic_blocks: List[BlockToken] = []
         chapter_h1_block_node: Optional[Heading] = None
         chapter_title = "Untitled Chapter"
@@ -184,6 +184,7 @@ class DocumentModelBuilder:
                     h3_number_in_panel=h3_counter,
                     source_filename=source_filename,
                     heading_line_number=None,
+                    version=1,
                 )
             )
             return h3_list
@@ -231,6 +232,7 @@ class DocumentModelBuilder:
                             h3_number_in_panel=h3_counter,
                             source_filename=source_filename,
                             heading_line_number=h3_line,
+                            version=1,
                         )
                     )
                 active_h3_block = block
@@ -275,6 +277,7 @@ class DocumentModelBuilder:
                     h3_number_in_panel=h3_counter,
                     source_filename=source_filename,
                     heading_line_number=h3_line,
+                    version=1,
                 )
             )
         return h3_list
@@ -306,6 +309,7 @@ class DocumentModelBuilder:
                             h4_number_in_h3=h4_counter,
                             source_filename=source_filename,
                             heading_line_number=h4_line,
+                            version=1,
                         )
                     )
                     current_h4_blocks = []
@@ -329,6 +333,7 @@ class DocumentModelBuilder:
                     h4_number_in_h3=h4_counter,
                     source_filename=source_filename,
                     heading_line_number=h4_line,
+                    version=1,
                 )
             )
         initial_content_md = render_blocks_to_markdown(initial_content_blocks, renderer)
