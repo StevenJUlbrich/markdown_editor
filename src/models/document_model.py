@@ -76,10 +76,8 @@ class SceneAnalysisPydantic(BaseModel):
     notes: Optional[str] = None
 
 
-# --- Versioning Mixin ---
+# --- Versioning Mixin (no field, just logic) ---
 class VersionedContentMixin:
-    version: int = 1
-
     def update_content(self, **fields):
         changed = False
         for field, value in fields.items():
@@ -88,11 +86,11 @@ class VersionedContentMixin:
                 if old != value:
                     setattr(self, field, value)
                     changed = True
-        if changed:
+        if changed and hasattr(self, "version"):
             self.version += 1
 
 
-# --- Models ---
+# --- Models (no duplicate classes, all fields preserved, versioning enabled) ---
 class H4Pydantic(BaseModel, VersionedContentMixin):
     heading_text: str
     mistletoe_h4_block: Optional[Any] = None
