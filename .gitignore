@@ -44,3 +44,5 @@ src/batch_processing/__pycache__/comic_panel_batch_processor.cpython-312.pyc
 src/models/__pycache__/comic_panel_image_sheet.cpython-312.pyc
 src/parsing/__pycache__/__init__.cpython-312.pyc
 src/parsing/__pycache__/comic_panel_mapping.cpython-312.pyc
+conversations/*.*
+
