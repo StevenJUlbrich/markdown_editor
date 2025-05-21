@@ -48,6 +48,13 @@ scene_checklist_evaluation: |
     "missing_elements": "<list any missing or weak elements>"
   }}
 
+scene_narration_essence: |
+  Create a concise 5-words-or-less statement that captures the essence of this scene:
+  ---
+  {scene_text}
+  ---
+  Return only the concise statement.
+
 scene_rewrite_fix: |
   Revise the following scene to address these missing elements: {missing_elements}
   Scene:
