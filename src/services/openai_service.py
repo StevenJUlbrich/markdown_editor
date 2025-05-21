@@ -5,7 +5,8 @@ import os
 import re
 import time
 from typing import Any, Dict, List, Optional
-
+from __future__ import annotations
+from services.openai_tracing import trace_openai_call
 from logging_config import get_logger
 from models.document_model import SceneAnalysisPydantic
 
@@ -27,7 +28,14 @@ from config import (
     OPENAI_TEMP_ENHANCEMENT,
     OPENAI_TEMP_SPEECH,
     OPENAI_TEMP_SUGGESTION,
+    OPENAI_REQUEST_TIMEOUT,
+    OPENAI_REQUEST_RETRY_TIMEOUT,
 )
+
+from openai import OpenAI
+
+client = OpenAI()
+
 
 # --- OpenAI Client Setup ---
 MOCK_CLIENT = False
@@ -48,7 +56,104 @@ else:
         logger.exception("Could not initialize OpenAI client: %s", e)
 
 
+# ---------------------------------------------------------------------------
+# Wrapper functions – each decorated for tracing
+# ---------------------------------------------------------------------------
+
+@trace_openai_call(prompt_name="scene_theme", panel_id_kw="panel_id")
+def suggest_scene_theme(panel_text: str, panel_id: int) -> Dict[str, Any]:
+    """Classify the scene theme of a single panel.
+
+    Returns a dict  `{theme: str, confidence: int, request_id: str}`.
+    """
+    prompt = _build_scene_theme_prompt(panel_text)
+    response = OpenAI.ChatCompletion.create(
+        model=OPENAI_MODEL_DEFAULT,
+        messages=prompt,
+        timeout=OPENAI_REQUEST_TIMEOUT,
+    )
+    # Simplified parsing
+    content = response.choices[0].message["content"].strip()
+    return {
+        "theme": content.split("|", 1)[0],
+        "confidence": int(content.split("|", 1)[1]),
+        "request_id": response["id"],
+    }
+
+
+@trace_openai_call(prompt_name="scene_rewrite", panel_id_kw="panel_id")
+def rewrite_scene(panel_text: str, required_roles: List[str], panel_id: int) -> str:
+    """Rewrite panel prose to new tone & inject required roles. Returns rewritten text."""
+    prompt = _build_scene_rewrite_prompt(panel_text, required_roles)
+    response = OpenAI.ChatCompletion.create(
+        model=OPENAI_MODEL_DEFAULT,
+        messages=prompt,
+        timeout=OPENAI_REQUEST_TIMEOUT,
+    )
+    return response.choices[0].message["content"].strip()
+
+
+@trace_openai_call(prompt_name="image_prompt", panel_id_kw="panel_id")
+def generate_image_prompt(scene_description: str, teaching_narrative: str, common_example: str, panel_id: int) -> str:
+    """Generate a DALL·E style image prompt for the given scene."""
+    prompt = _build_image_prompt(scene_description, teaching_narrative, common_example)
+    response = OpenAI.ChatCompletion.create(
+        model=OPENAI_MODEL_DEFAULT,
+        messages=prompt,
+        timeout=OPENAI_REQUEST_TIMEOUT,
+    )
+    return response.choices[0].message["content"].strip()
+
+
+@trace_openai_call(prompt_name="speech_bubbles", panel_id_kw="panel_id")
+def generate_speech_bubbles(rewritten_scene: str, max_bubbles: int, panel_id: int) -> List[str]:
+    """Ask the LLM for speech bubbles. Returns list of strings."""
+    prompt = _build_speech_bubble_prompt(rewritten_scene, max_bubbles)
+    response = OpenAI.ChatCompletion.create(
+        model=OPENAI_MODEL_DEFAULT,
+        messages=prompt,
+        timeout=OPENAI_REQUEST_TIMEOUT,
+    )
+    content = response.choices[0].message["content"].strip()
+    return [line.strip() for line in content.split("\n") if line.strip()]
+
+
+# ---------------------------------------------------------------------------
+# Internal prompt builders (unchanged stubs)
+# ---------------------------------------------------------------------------
+
+def _build_scene_theme_prompt(panel_text: str):  # noqa: ANN001
+    return [
+        {"role": "system", "content": "You are a narrative classifier."},
+        {"role": "user", "content": panel_text},
+    ]
+
+
+def _build_scene_rewrite_prompt(panel_text: str, required_roles: List[str]):  # noqa: ANN001
+    roles_str = ", ".join(required_roles)
+    return [
+        {"role": "system", "content": f"Rewrite the scene with roles: {roles_str}"},
+        {"role": "user", "content": panel_text},
+    ]
+
+
+def _build_image_prompt(scene_description: str, teaching_narrative: str, common_example: str):  # noqa: ANN001
+    return [
+        {"role": "system", "content": "Generate an image prompt."},
+        {"role": "user", "content": f"Scene: {scene_description}\nTeach: {teaching_narrative}\nAvoid: {common_example}"},
+    ]
+
+
+def _build_speech_bubble_prompt(rewritten_scene: str, max_bubbles: int):  # noqa: ANN001
+    return [
+        {"role": "system", "content": f"Return up to {max_bubbles} speech bubbles."},
+        {"role": "user", "content": rewritten_scene},
+    ]
+
+
+
 # --- BATCHED ROLE SUGGESTION FUNCTION ---
+
 def suggest_character_roles_for_panels(
     panels: List[Dict],
     model: str = OPENAI_MODEL_SUGGESTION,
