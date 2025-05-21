@@ -236,6 +236,61 @@ class SceneEnhancer:
         panel_sheet.current_scene_enhancement = "llm-v1"
         return panel_sheet
 
+    def generate_speech_bubbles_for_roles(
+        self, panel_sheet: ComicPanelImageSheet, roles: List[str]
+    ) -> ComicPanelImageSheet:
+        """
+        Generate speech bubbles for suggested roles and update the panel sheet.
+
+        Args:
+            panel_sheet: ComicPanelImageSheet to update
+            roles: List of character roles to generate speech for
+
+        Returns:
+            Updated ComicPanelImageSheet with speech bubbles
+        """
+        # Import here to avoid circular import issues
+        from services.openai_service import generate_speech_for_characters
+
+        # Create dummy character profiles
+        character_profiles = []
+        for role in roles:
+            character_profiles.append(
+                {
+                    "name": f"{role}",  # Use role as placeholder name
+                    "role": role,
+                    "tone": "professional",  # Default tone
+                }
+            )
+
+        # Call OpenAI to generate speech
+        speech_result = generate_speech_for_characters(
+            panel_sheet.scene_description_original, character_profiles
+        )
+
+        # Create speech bubbles
+        bubbles = []
+        for char_name, speech_data in speech_result.items():
+            bubbles.append(
+                SpeechBubble(
+                    character_name=char_name,
+                    role=next(
+                        (
+                            p["role"]
+                            for p in character_profiles
+                            if p["name"] == char_name
+                        ),
+                        "Unknown",
+                    ),
+                    speech=speech_data.get("text", ""),
+                    interface=speech_data.get("interface", "in_person"),
+                )
+            )
+
+        # Update panel sheet
+        panel_sheet.speech_bubbles = bubbles
+        return panel_sheet
+
 
 # Usage example (assuming you've parsed the markdown to a list of panel dicts and loaded the character JSON):
 # from scene_enhancer import SceneEnhancer

@@ -1,8 +1,14 @@
 # character_role_suggester.py (updated)
 
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+from models.comic_panel_image_sheet import (
+    ComicPanelImageSheet,
+    SceneEnhancement,
+    SpeechBubble,
+)
 from models.document_model import ChapterPydantic, PanelPydantic
 from models.section_titles import SECTION_TITLES
 from parsing.markdown_document import MarkdownDocument
@@ -93,3 +99,114 @@ class CharacterRoleSuggester:
     ) -> Dict[str, Dict[str, List[str]]]:
         """Process a single markdown file using Pydantic models."""
         return CharacterRoleSuggester._suggest_roles_for_path(Path(file_path))
+
+    @staticmethod
+    def enhance_panel_with_roles(
+        doc: MarkdownDocument, panel_number: int
+    ) -> Optional[ComicPanelImageSheet]:
+        """Create a ComicPanelImageSheet with suggested roles and speech bubbles."""
+        # Import required modules
+        from datetime import datetime
+        from pathlib import Path
+
+        from services.openai_service import (
+            generate_speech_for_characters,
+            suggest_character_roles_for_panels,
+        )
+
+        panel = None
+        for element in doc.chapter_model.document_elements:
+            if (
+                isinstance(element, PanelPydantic)
+                and element.panel_number_in_doc == panel_number
+            ):
+                panel = element
+                break
+
+        if not panel:
+            return None
+
+        # Extract section content
+        sections = doc.extract_named_sections_from_panel(panel.panel_number_in_doc)
+        scene = sections.get(SECTION_TITLES.SCENE_DESCRIPTION.value, "")
+        teaching = sections.get(SECTION_TITLES.TEACHING_NARRATIVE.value, "")
+        common_example = sections.get(SECTION_TITLES.COMMON_EXAMPLE.value, "")
+
+        if not scene and not teaching:
+            return None
+
+        # Get role suggestions
+        panel_input = {
+            "title": panel.panel_title_text,
+            "scene": scene,
+            "teaching": teaching,
+        }
+        roles_dict = suggest_character_roles_for_panels([panel_input])
+        roles = roles_dict.get(panel.panel_title_text, [])
+
+        # Create ComicPanelImageSheet
+        panel_sheet = ComicPanelImageSheet(
+            panel_id=f"panel_{panel.panel_number_in_doc}",
+            chapter_id=Path(doc.filepath).stem if doc.filepath else None,
+            panel_index=panel.panel_number_in_doc,
+            scene_description_original=scene,
+            teaching_narrative_original=teaching,
+            common_example_original=common_example,
+            processing_metadata={
+                "processed_by": "CharacterRoleSuggester",
+                "timestamp": datetime.utcnow().isoformat(),
+                "suggested_roles": roles,
+            },
+        )
+
+        # Generate character profiles from roles
+        character_profiles = []
+        for role in roles:
+            character_profiles.append(
+                {
+                    "name": f"{role}",  # Use role as placeholder name
+                    "role": role,
+                    "tone": "professional",  # Default tone
+                }
+            )
+
+        # Generate speech bubbles
+        if character_profiles:
+            speech_result = generate_speech_for_characters(scene, character_profiles)
+
+            # Create SpeechBubble objects
+            for char_name, speech_data in speech_result.items():
+                bubble = SpeechBubble(
+                    character_name=char_name,
+                    role=next(
+                        (
+                            p["role"]
+                            for p in character_profiles
+                            if p["name"] == char_name
+                        ),
+                        "Unknown",
+                    ),
+                    speech=speech_data.get("text", ""),
+                    interface=speech_data.get("interface", "in_person"),
+                )
+                panel_sheet.speech_bubbles.append(bubble)
+
+        # Create a basic scene enhancement
+        from services.openai_service import rewrite_scene_and_teaching_as_summary
+
+        enhanced_scene = rewrite_scene_and_teaching_as_summary(scene, teaching)
+
+        enhancement = SceneEnhancement(
+            version_id="roles-v1",
+            scene_text=enhanced_scene,
+            llm_metadata={
+                "scene_theme": "auto",
+                "generated_roles": roles,
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
+
+        panel_sheet.scene_enhancements.append(enhancement)
+        panel_sheet.current_scene_enhancement = "roles-v1"
+
+        return panel_sheet

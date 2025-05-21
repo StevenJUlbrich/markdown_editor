@@ -595,3 +595,72 @@ Respond with ONLY a single valid JSON object. Do not wrap in markdown fences. No
             inferred_by_ai=True,
             notes="Fallback to default scene type due to AI error.",
         )
+
+
+def generate_speech_for_characters(
+    scene_description: str,
+    character_profiles: List[Dict[str, Any]],
+    model: str = OPENAI_MODEL_SPEECH,
+    temperature: float = OPENAI_TEMP_SPEECH,
+) -> Dict[str, Dict[str, str]]:
+    """
+    Generate speech for characters based on their profiles and a scene description.
+
+    Args:
+        scene_description: Text describing the scene
+        character_profiles: List of character profile dictionaries with 'name', 'role', etc.
+        model: OpenAI model to use
+        temperature: Creativity setting
+
+    Returns:
+        Dictionary mapping character names to their speech data
+    """
+    character_prompts = []
+    for profile in character_profiles:
+        char_desc = f"- {profile['name']} ({profile['role']})"
+        if profile.get("tone"):
+            char_desc += f": {profile['tone']}"
+        character_prompts.append(char_desc)
+
+    prompt = f"""
+    Generate realistic speech for characters in this scene.
+    
+    Scene:
+    {scene_description}
+    
+    Characters:
+    {chr(10).join(character_prompts)}
+    
+    Instructions:
+    - Write a short speech bubble (max 15 words) for each character
+    - Determine if they would be speaking in person or via a digital interface (slack, zoom, etc.)
+    - Speech should reflect the character's role and the scene context
+    - If a character would realistically be silent in this scene, indicate that
+    
+    Return a JSON object like:
+    {{
+      "Character Name": {{ "text": "Speech here", "interface": "in_person|slack|zoom|etc" }},
+      "Another Name": {{ "text": "", "interface": "in_person" }} // empty text means silent
+    }}
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+        )
+        content = response.choices[0].message.content.strip()
+
+        # Clean up response
+        if content.startswith("```"):
+            content = re.sub(
+                r"^```(?:json)?\s*|\s*```$", "", content.strip(), flags=re.IGNORECASE
+            )
+
+        parsed = json.loads(content)
+        return parsed
+
+    except Exception as e:
+        logger.error("Failed to generate speech: %s", str(e))
+        return {}

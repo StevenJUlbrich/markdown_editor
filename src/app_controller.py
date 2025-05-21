@@ -219,3 +219,89 @@ class AppController:
             idx += 1
 
         return sections
+
+    def enhance_panel_with_roles_and_speech(
+        self, panel_number: int
+    ) -> Optional[ComicPanelImageSheet]:
+        """
+        Enhance a panel with character roles and speech bubbles.
+
+        Args:
+            panel_number: Number of the panel to enhance
+
+        Returns:
+            Enhanced ComicPanelImageSheet or None if panel not found
+        """
+        if not self.doc:
+            logger.warning("No document loaded for panel enhancement.")
+            return None
+
+        # Get panel from the document model
+        panel = self.doc.get_panel_by_number(panel_number)
+        if not panel:
+            logger.error(f"Panel {panel_number} not found.")
+            return None
+
+        # Extract panel content
+        panel_md = self.doc.get_panel_markdown_by_number(panel_number)
+        if not panel_md:
+            logger.error(f"Panel {panel_number} markdown not found.")
+            return None
+
+        # Create panel sheet from markdown
+        from parsing.comic_panel_mapping import map_to_comic_panel_image_sheet
+
+        panel_sheet = map_to_comic_panel_image_sheet(
+            panel_md,
+            chapter_id=(
+                os.path.basename(self.doc.filepath) if self.doc.filepath else None
+            ),
+            panel_index=panel_number,
+        )
+
+        # Get role suggestions
+        from services.character_role_suggester import CharacterRoleSuggester
+
+        roles_dict = CharacterRoleSuggester.suggest_character_roles_in_file(
+            self.doc.filepath
+        )
+        roles = []
+        for panel_title, panel_roles in roles_dict.get(
+            os.path.basename(self.doc.filepath), {}
+        ).items():
+            if panel_title == panel.panel_title_text:
+                roles = panel_roles
+                break
+
+        if not roles:
+            logger.warning(f"No roles suggested for panel {panel_number}.")
+            return panel_sheet
+
+        # Create SceneEnhancer instance and generate speech bubbles
+        import yaml
+
+        from services.scene_enhancer import SceneEnhancer
+
+        # Load character data (ensure it exists or load from member variable)
+        character_data = {"characters": {}}
+        if hasattr(self, "character_base") and self.character_base:
+            character_data = {"characters": self.character_base}
+        elif os.path.exists("character_base_list.json"):
+            with open("character_base_list.json", "r", encoding="utf-8") as f:
+                character_data = json.load(f)
+
+        # Load environment templates (ensure the file exists)
+        env_template_path = "scene_environment_templates.yaml"
+        if not os.path.exists(env_template_path):
+            env_template_path = None
+
+        # Create enhancer and generate speech
+        enhancer = SceneEnhancer(
+            chapter_panels=[],  # Not needed for this operation
+            character_repo=character_data,
+            env_template_path=env_template_path,
+        )
+        panel_sheet = enhancer.generate_speech_bubbles_for_roles(panel_sheet, roles)
+
+        self.current_enriched_panel = panel_sheet
+        return panel_sheet

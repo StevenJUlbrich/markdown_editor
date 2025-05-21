@@ -20,12 +20,13 @@ def main():
         print("\n=== Markdown Training CLI ===")
         print("1. Load Markdown Document")
         print("2. List Panels")
-        print("3. List All Sections")  # New option
+        print("3. List All Sections")
         print("4. Select Panel by Number")
         print("5. Show Named Sections in Selected Panel")
         print("6. Update Named Section in Panel")
         print("7. Save Document")
         print("8. Suggest Character Roles Only (Panels in Folder)")
+        print("9. Enhance Panel with Roles and Speech")
         print("0. Exit")
         choice = input("Enter your choice: ").strip()
 
@@ -93,17 +94,39 @@ def main():
                         print(f"    Suggested Roles: {roles}")
             except Exception as e:
                 logger.error("Error: %s", e)
-        elif choice == "8":
+        # elif choice == "8":
+        #     if not document_loaded:
+        #         print("Load and enrich a document first.")
+        #         continue
+        #     prompts_path = input("Enter LLM prompts YAML path: ").strip()
+        #     characters_path = input("Enter character base list JSON path: ").strip()
+        #     controller.load_llm_prompts(prompts_path)
+        #     controller.load_character_base(characters_path)
+        #     enriched = controller.enrich_all_panels()
+        #     out_path = input("Enter output JSON file path: ").strip()
+        #     controller.save_enriched_panels(out_path, enriched)
+        elif choice == "9":
             if not document_loaded:
-                print("Load and enrich a document first.")
+                print("Load a document first.")
                 continue
-            prompts_path = input("Enter LLM prompts YAML path: ").strip()
-            characters_path = input("Enter character base list JSON path: ").strip()
-            controller.load_llm_prompts(prompts_path)
-            controller.load_character_base(characters_path)
-            enriched = controller.enrich_all_panels()
-            out_path = input("Enter output JSON file path: ").strip()
-            controller.save_enriched_panels(out_path, enriched)
+            panel_num = input(
+                "Enter panel number to enhance with roles and speech: "
+            ).strip()
+            try:
+                panel_num = int(panel_num)
+                panel_sheet = controller.enhance_panel_with_roles_and_speech(panel_num)
+                if panel_sheet:
+                    print(
+                        f"Enhanced panel {panel_num} with {len(panel_sheet.speech_bubbles)} speech bubbles"
+                    )
+                    for bubble in panel_sheet.speech_bubbles:
+                        print(
+                            f'  {bubble.character_name} ({bubble.role}) [{bubble.interface}]: "{bubble.speech}"'
+                        )
+                else:
+                    print(f"Failed to enhance panel {panel_num}")
+            except Exception as e:
+                print(f"Error: {e}")
         elif choice == "0":
             print("Exiting.")
             break
