@@ -57,6 +57,9 @@ def suggest_character_roles_for_panels(
 ) -> Dict[str, List[str]]:
     """
     Sends one batch prompt for all panels, returns {panel_title: [role, ...], ...}
+
+    Args:
+        panels: List of dictionaries with keys 'title', 'scene', and 'teaching'extracted from Pydantic models
     """
     prompt_panels = []
     for p in panels:
@@ -72,6 +75,7 @@ Return a JSON dictionary: {{ "Panel Title 1": [roles...], ... }}
 {''.join(prompt_panels)}
 Respond ONLY with the JSON object.
     """
+    # Rest of method remains unchanged...
     for attempt in range(max_attempts):
         try:
             response = client.chat.completions.create(
