@@ -20,11 +20,12 @@ def main():
         print("\n=== Markdown Training CLI ===")
         print("1. Load Markdown Document")
         print("2. List Panels")
-        print("3. Select Panel by Number")
-        print("4. Show Named Sections in Selected Panel")
-        print("5. Update Named Section in Panel")
-        print("6. Save Document")
-        print("7. Suggest Character Roles Only (Panels in Folder)")
+        print("3. List All Sections")  # New option
+        print("4. Select Panel by Number")
+        print("5. Show Named Sections in Selected Panel")
+        print("6. Update Named Section in Panel")
+        print("7. Save Document")
+        print("8. Suggest Character Roles Only (Panels in Folder)")
         print("0. Exit")
         choice = input("Enter your choice: ").strip()
 
@@ -42,6 +43,12 @@ def main():
             if not document_loaded:
                 print("Load a document first.")
                 continue
+            sections = controller.list_all_sections()
+            print_section_list(sections)
+        elif choice == "4":
+            if not document_loaded:
+                print("Load a document first.")
+                continue
             num = input("Panel number: ").strip()
             try:
                 num = int(num)
@@ -49,7 +56,7 @@ def main():
                 print(f"Panel selected: {selected}")
             except Exception:
                 print("Invalid input.")
-        elif choice == "4":
+        elif choice == "5":
             if not document_loaded or controller.current_selected_panel_id is None:
                 print("Select a panel first.")
                 continue
@@ -57,7 +64,7 @@ def main():
             print("Named Sections:")
             for k, v in sections.items():
                 print(f"-- {k} --\n{v[:120]}{'...' if len(v) > 120 else ''}\n")
-        elif choice == "5":
+        elif choice == "6":
             if not document_loaded or controller.current_selected_panel_id is None:
                 print("Select a panel first.")
                 continue
@@ -67,7 +74,7 @@ def main():
             )
             success = controller.update_named_section(title, new_md)
             print(f"Update success: {success}")
-        elif choice == "6":
+        elif choice == "7":
             if not document_loaded:
                 print("Load a document first.")
                 continue
@@ -75,7 +82,7 @@ def main():
             success = controller.save_document(out_path)
             print(f"Save success: {success}")
 
-        elif choice == "7":
+        elif choice == "8":
             folder = input("Enter folder path containing markdown files: ").strip()
             try:
                 results = controller.suggest_character_roles_in_folder(folder)
@@ -102,6 +109,20 @@ def main():
             break
         else:
             print("Unknown choice.")
+
+
+def print_section_list(sections):
+    print("\nSections in Document:")
+    for s in sections:
+        print(
+            f"   {s['index']}: [{s['type']}] '{s['title']}' (version {s['version']})",
+            end="",
+        )
+        if s["line"]:
+            print(f", line {s['line']}", end="")
+        if s["source"]:
+            print(f", source: {s['source']}", end="")
+        print()
 
 
 if __name__ == "__main__":

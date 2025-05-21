@@ -156,3 +156,66 @@ class AppController:
         """Return the enriched JSON for the selected panel (for GUI preview or API)."""
         enriched = self.enrich_panel_with_llm(panel_number)
         return enriched.model_dump() if enriched else None
+
+    def list_all_sections(self) -> List[Dict[str, Any]]:
+        """
+        Lists all sections in the document, including both generic content and panels.
+
+        Returns:
+            List of dictionaries with section information.
+        """
+        if not self.doc or not self.doc.chapter_model:
+            logger.warning("No document loaded for listing sections.")
+            return []
+
+        sections = []
+        idx = 0
+
+        for element in self.doc.chapter_model.document_elements:
+            if hasattr(element, "panel_title_text"):  # PanelPydantic
+                sections.append(
+                    {
+                        "index": idx,
+                        "type": "Panel",
+                        "title": element.panel_title_text,
+                        "version": getattr(element, "version", 1),
+                        "line": getattr(element, "heading_line_number", None),
+                        "source": getattr(element, "source_filename", None),
+                    }
+                )
+            elif (
+                hasattr(element, "title_text") and element.title_text
+            ):  # GenericContentPydantic with title
+                sections.append(
+                    {
+                        "index": idx,
+                        "type": "Section",
+                        "title": element.title_text,
+                        "version": getattr(element, "version", 1),
+                        "line": getattr(element, "heading_line_number", None),
+                        "source": getattr(element, "source_filename", None),
+                    }
+                )
+            else:  # GenericContentPydantic without title or other element
+                title = "Untitled Section"
+                # Try to extract a title from the first few words
+                if hasattr(element, "content_markdown") and element.content_markdown:
+                    first_line = element.content_markdown.strip().split("\n")[0]
+                    if len(first_line) > 30:
+                        title = f"{first_line[:30]}..."
+                    else:
+                        title = first_line
+
+                sections.append(
+                    {
+                        "index": idx,
+                        "type": "Content",
+                        "title": title,
+                        "version": getattr(element, "version", 1),
+                        "line": getattr(element, "heading_line_number", None),
+                        "source": getattr(element, "source_filename", None),
+                    }
+                )
+            idx += 1
+
+        return sections
