@@ -1,3 +1,5 @@
+# Summary Action List
+
 | Step                    | Description                            | Automated? | Manual Check? |
 | ----------------------- | -------------------------------------- | ---------- | ------------- |
 | Evaluate Scene Type     | Is the scene type balanced in chapter? | Yes        | Optional      |
