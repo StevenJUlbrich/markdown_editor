@@ -1,0 +1,13 @@
+Chaos at Midnight – The Illusion of Green
+
+Illustrate a shadowy, tense operations center at precisely 2:00 AM, bathed in dim, eerie lighting from multiple monitors displaying bright, deceptive green status indicators. Center the scene around three distinct characters, each with speech bubbles capturing their dialogue:
+
+Daniel (anxious, sarcastic): "Everything's green but totally broken! What gives?"
+
+Wanjiru (animated, confused): "Logs are empty—why does it work this way in production?"
+
+Hector Alavaz (calm, authoritative, pointing at tracing dashboard): "Dashboards show metrics, not user experience. Here's the real problem."
+
+In the background, visually indicate ringing phones and a chaotic environment. Daniel appears tense, with earbuds half-in, glancing nervously at screens. Wanjiru urgently gestures toward her sticker-covered laptop. Hector confidently directs attention to a tracing dashboard, prominently displaying anomalies in red, sharply contrasting the deceptive green indicators around them.
+
+The atmosphere should vividly convey chaos transforming into clarity through Hector's guidance, shifting the juniors' confusion to focused determination.

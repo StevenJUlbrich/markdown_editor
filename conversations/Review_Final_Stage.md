@@ -24,49 +24,7 @@
 
 ## 2. **Implementation Pattern / Algorithm**
 
-Below is a **reusable pattern** you could implement, either as a pipeline stage or as a service in your codebase:
-
-```python
-class SceneImprover:
-    """
-    Class responsible for analyzing and enhancing scene descriptions for SRE graphic novel panels.
-    """
-    def __init__(self, panel_data, chapter_context):
-        self.panel = panel_data            # Dict or Pydantic model for the panel
-        self.chapter = chapter_context     # Reference to whole chapter (for balancing)
-    
-    def analyze_scene_balance(self):
-        # Review chapter to check balance of Scene Types
-        # Recommend scene type if imbalanced, especially for first/last panels
-        pass
-
-    def generate_role_and_cast(self):
-        # Identify all characters, assign clear roles, and indicate physical/digital presence
-        pass
-
-    def enrich_environment_details(self):
-        # Add lighting, equipment, UI displays, placement, and tone
-        pass
-
-    def synthesize_narration(self):
-        # Generate concise (<=5 word) narration
-        pass
-
-    def validate_scene_effectiveness(self):
-        # Checklist: speech bubble clarity, placement, emotion, pedagogical value
-        pass
-
-    def improve_scene_description(self):
-        # MAIN method: orchestrates all steps and returns the improved scene
-        self.analyze_scene_balance()
-        self.generate_role_and_cast()
-        self.enrich_environment_details()
-        self.synthesize_narration()
-        self.validate_scene_effectiveness()
-        return self.panel  # Return updated data/model
-```
-
-You could implement this as a class (as above), or as a set of functions/services (more functional pipeline style), depending on how you want to wire it into your batch/enhancement processing pipeline.
+TDB
 
 ---
 
@@ -132,7 +90,7 @@ Let’s walk through an **example for a single panel** (pseudo-real content):
 
 **Where to place this logic?**
 
-* Likely a new service: e.g., `services/scene_improver.py`
+* Likely a new service
 * Called during the enhancement phase in your batch/enhanced processor.
 * Could be triggered automatically, or used interactively during panel review.
 
@@ -159,15 +117,3 @@ for panel in chapter.panels:
 | Concise Narration      | 5 words or less essence                | Yes        | Yes           |
 | Character Presence     | Physical or digital defined?           | Yes        | Yes           |
 | Validate Effectiveness | Are all elements pedagogically clear?  | Partial    | Yes           |
-
----
-
-## **Next Actions**
-
-* If you’d like, I can help **implement a draft of the `SceneImprover` class** or integrate it into your existing enhancement process.
-* Or, I can **write a step-by-step checklist script** that could be run for each panel to suggest improvements automatically.
-
-**How would you like to proceed?**
-
-* Do you want a code template, a ready-to-use Python module, or integration instructions?
-* Or, do you want to see this in action with a real panel example from your content?
